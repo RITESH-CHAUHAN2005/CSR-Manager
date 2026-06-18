@@ -21,17 +21,28 @@ export function verifyToken(token: string): JwtPayload {
 }
 
 // Store the JWT in an httpOnly cookie so it cannot be read by JS (XSS-resistant).
-// SameSite=strict mitigates CSRF; Secure is enabled in production (HTTPS).
+//
+// SameSite:
+//  - dev (same-origin via Vite proxy): 'strict' — strongest CSRF protection.
+//  - prod: 'none' so the cookie is sent on cross-site requests when the frontend
+//    (e.g. a static host) and the API (e.g. Railway) live on different domains.
+//    'none' REQUIRES Secure=true, which is why prod must be served over HTTPS.
+//    CSRF risk is contained by the strict CORS allow-list (see app.ts).
+// clearAuthCookie must use the SAME attributes or browsers won't clear it.
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: (isProd ? 'none' : 'strict') as 'none' | 'strict',
+  path: '/',
+}
+
 export function setAuthCookie(res: Response, token: string) {
   res.cookie(AUTH_COOKIE, token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: 'strict',
+    ...cookieOptions,
     maxAge: 24 * 60 * 60 * 1000, // 1 day
-    path: '/',
   })
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(AUTH_COOKIE, { path: '/' })
+  res.clearCookie(AUTH_COOKIE, cookieOptions)
 }

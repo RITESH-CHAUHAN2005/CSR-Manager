@@ -2,9 +2,16 @@ import axios from 'axios'
 
 // Axios instance for the Express API.
 // withCredentials sends the httpOnly auth cookie on every request.
-// Vite proxies /api -> http://localhost:5000 in dev (see vite.config.ts).
+//
+// Base URL resolution:
+//  - Dev: leave VITE_API_URL unset -> baseURL '/api', which Vite proxies to
+//    http://localhost:5000 (see vite.config.ts).
+//  - Split-domain prod (e.g. frontend on static host, backend on Railway):
+//    set VITE_API_URL to the backend origin, e.g. https://xxx.up.railway.app
+//    The '/api' suffix is appended automatically.
+const apiOrigin = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: apiOrigin ? `${apiOrigin}/api` : '/api',
   withCredentials: true,
 })
 
