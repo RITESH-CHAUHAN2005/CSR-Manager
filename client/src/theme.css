@@ -1,0 +1,30 @@
+/*
+ * THEME TOKENS — single source of truth for the app's color scheme.
+ * 60-30-10 palette:
+ *   60% Neutral  — Light Grey  #f4f7f6  (page background / surfaces)
+ *   30% Brand    — Corporate Teal #009ca6 (sidebar, nav, icons, secondary headings)
+ *   10% Accent   — Vibrant Orange #f58220 (CTA buttons, attention numbers)
+ * Values are space-separated RGB channels so Tailwind can apply opacity.
+ */
+:root {
+  /* Brand teal (primary / navigation) */
+  --color-primary: 0 156 166;        /* #009ca6 teal */
+  --color-primary-dark: 0 128 137;   /* #008089 darker teal */
+  --color-primary-light: 77 188 196; /* #4dbcc4 light teal */
+
+  /* Sidebar — teal brand surface */
+  --color-sidebar: 0 128 137;        /* #008089 deep teal */
+  --color-sidebar-hover: 0 156 166;  /* #009ca6 */
+  --color-sidebar-active: 245 130 32;/* #f58220 orange (active nav highlight) */
+
+  /* Accent orange (CTAs / attention) */
+  --color-accent: 245 130 32;        /* #f58220 orange */
+  --color-accent-dark: 219 112 22;   /* #db7016 darker orange */
+
+  /* Status */
+  --color-success: 22 163 74;        /* #16a34a green (positive amounts) */
+  --color-danger: 220 38 38;         /* #dc2626 red (expenditure/delete) */
+
+  /* Neutral surfaces */
+  --color-canvas: 244 247 246;       /* #f4f7f6 light grey background */
+}
