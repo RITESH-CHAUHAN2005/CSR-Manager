@@ -80,7 +80,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     statusCode: 200,
   }).catch(() => {})
 
-  res.json({ user: user.toJSON() })
+  // Return the token in the body too. Same-origin clients use the httpOnly
+  // cookie; split-domain clients (frontend and API on different hosts, where
+  // third-party cookies may be blocked) send it back as a Bearer header.
+  res.json({ user: user.toJSON(), token })
 })
 
 // Employee self-registration: creates a pending 'user' account. Admin must approve

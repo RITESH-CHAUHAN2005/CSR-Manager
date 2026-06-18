@@ -15,6 +15,21 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+// Bearer-token fallback for split-domain deploys (frontend and API on different
+// hosts). The httpOnly cookie still works same-origin, but third-party cookies
+// can be blocked by the browser; storing the token and sending it as an
+// Authorization header keeps login working everywhere.
+const TOKEN_KEY = 'csr_token'
+export function setAuthToken(token: string | null) {
+  if (token) localStorage.setItem(TOKEN_KEY, token)
+  else localStorage.removeItem(TOKEN_KEY)
+}
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
 // Toggle the data source: set VITE_USE_API=true (and run the backend) for live data.
 // Default (unset) uses the in-memory mock so the client runs standalone.
 export const USE_API = import.meta.env.VITE_USE_API === 'true'

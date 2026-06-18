@@ -2,7 +2,7 @@
 //   - mock: validates against demoUsers, persists the user in localStorage.
 //   - api:  real JWT login; the token lives in an httpOnly cookie (never in JS),
 //           so session restore is done via GET /auth/me.
-import { api, USE_API } from './api'
+import { api, setAuthToken, USE_API } from './api'
 import type { Role, User } from '../types'
 import { demoUsers } from '../mocks/seedData'
 
@@ -50,11 +50,13 @@ const mockAuth: AuthService = {
 
 const apiAuth: AuthService = {
   async login(email, password, role) {
-    const res = await api.post<{ user: User }>('/auth/login', {
+    const res = await api.post<{ user: User; token?: string }>('/auth/login', {
       email: email.trim().toLowerCase(),
       password,
       role,
     })
+    // Persist the token for the Bearer-header fallback (split-domain deploys).
+    if (res.data.token) setAuthToken(res.data.token)
     return res.data.user
   },
   async register(input) {
@@ -62,7 +64,11 @@ const apiAuth: AuthService = {
     return res.data.message
   },
   async logout() {
-    await api.post('/auth/logout')
+    try {
+      await api.post('/auth/logout')
+    } finally {
+      setAuthToken(null)
+    }
   },
   async me() {
     try {
