@@ -1,0 +1,36 @@
+# Render Blueprint — deploys the CSR Manager Express backend.
+# In the Render dashboard: New + > Blueprint > connect this repo. Render reads
+# this file and pre-fills everything below; you only fill the `sync: false`
+# secrets (MongoDB URI, seed passwords) when prompted.
+#
+# Note: this deploys the BACKEND only. The frontend is built separately and
+# uploaded to Hostinger (see client/.env: VITE_API_URL = this service's URL).
+services:
+  - type: web
+    name: csr-manager-backend
+    runtime: node
+    plan: free
+    region: singapore # closest free region to India
+    rootDir: server # monorepo: build/run from the server/ subdir
+    # NODE_ENV=production makes a plain `npm install` skip devDependencies
+    # (typescript/tsx), which the build needs — so force them in with --include=dev.
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong secret automatically
+      - key: MONGODB_URI
+        sync: false # paste your MongoDB Atlas connection string
+      - key: CLIENT_ORIGIN
+        sync: false # your Hostinger frontend URL, e.g. https://xxx.hostingersite.com
+      - key: SEED_ADMIN_EMAIL
+        value: admin@csr.com
+      - key: SEED_ADMIN_PASSWORD
+        sync: false # choose a strong admin password
+      - key: SEED_USER_EMAIL
+        value: user@csr.com
+      - key: SEED_USER_PASSWORD
+        sync: false # choose a strong user password
