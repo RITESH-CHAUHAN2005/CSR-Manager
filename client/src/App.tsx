@@ -66,15 +66,8 @@ export default function App() {
           </RequireAuth>
         }
       >
-        {/* Dashboard — admin + viewer only (editors do not see it) */}
-        <Route
-          path="/dashboard"
-          element={
-            <RequireRole allow={['admin', 'viewer']}>
-              <Dashboard />
-            </RequireRole>
-          }
-        />
+        {/* Dashboard — visible to every signed-in role */}
+        <Route path="/dashboard" element={<Dashboard />} />
         {/* Data pages — every role (write actions are gated inside each page) */}
         <Route path="/companies" element={<Companies />} />
         <Route path="/financial-years" element={<FinancialYears />} />

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authenticate } from '../middleware/auth.js'
-import { requireDashboard, requireWrite } from '../middleware/authorize.js'
+import { requireWrite } from '../middleware/authorize.js'
 import {
   getCompanyPositions,
   getDashboard,
@@ -11,8 +11,8 @@ import { exportExcel, exportPdf } from '../controllers/exportController.js'
 const router = Router()
 router.use(authenticate)
 
-// Main Dashboard overview — admin + viewer only (editors do not see the Dashboard).
-router.get('/dashboard/summary', requireDashboard, getDashboard)
+// Main Dashboard overview — visible to every signed-in role.
+router.get('/dashboard/summary', getDashboard)
 
 // Reports data — visible to every role (admin, editor, viewer).
 router.get('/reports/year-wise', getYearWiseReport)

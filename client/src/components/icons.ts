@@ -31,4 +31,5 @@ export {
   Gauge,
   Clock,
   Hourglass,
+  List as Menu,
 } from '@phosphor-icons/react'

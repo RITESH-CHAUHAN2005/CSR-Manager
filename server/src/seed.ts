@@ -30,31 +30,14 @@ export async function seedDatabase() {
   ])
 
   // --- Users (passwords hashed with bcrypt, cost 12) ---
-  // One admin (the only admin; created here, never via the API) plus a demo editor
-  // and a demo viewer so each role can be tried immediately. Admins manage further
-  // editor/viewer accounts from the Admin Panel.
-  await User.create([
-    {
-      name: 'CSR Administrator',
-      email: env.SEED_ADMIN_EMAIL,
-      passwordHash: await bcrypt.hash(env.SEED_ADMIN_PASSWORD, 12),
-      role: 'admin',
-    },
-    {
-      name: 'CSR Editor',
-      email: 'editor@csr.com',
-      passwordHash: await bcrypt.hash('Editor@123', 12),
-      role: 'editor',
-      companyId: tcs._id,
-    },
-    {
-      name: 'CSR Viewer',
-      email: 'viewer@csr.com',
-      passwordHash: await bcrypt.hash('Viewer@123', 12),
-      role: 'viewer',
-      companyId: tcs._id,
-    },
-  ])
+  // ONLY the admin account is seeded (created here, never via the API). The admin
+  // creates real editor/viewer accounts from the Admin Panel — no demo logins.
+  await User.create({
+    name: 'CSR Administrator',
+    email: env.SEED_ADMIN_EMAIL,
+    passwordHash: await bcrypt.hash(env.SEED_ADMIN_PASSWORD, 12),
+    role: 'admin',
+  })
 
   // --- Financial Years ---
   const [fy1, fy2, fy3] = await FinancialYear.create([
@@ -103,8 +86,6 @@ export async function seedDatabase() {
     { date: '2024-11-28', projectId: p7._id, companyId: hdfc._id, financialYearId: fy3._id, category: 'Equipment', approvedBy: 'Trustee Board', amount: 700000 },
   ])
 
-  console.log('✅ Seed complete:')
-  console.log('   Admin  —', env.SEED_ADMIN_EMAIL, '/', env.SEED_ADMIN_PASSWORD)
-  console.log('   Editor — editor@csr.com / Editor@123')
-  console.log('   Viewer — viewer@csr.com / Viewer@123')
+  console.log('✅ Seed complete (sample data + admin only):')
+  console.log('   Admin —', env.SEED_ADMIN_EMAIL, '/', env.SEED_ADMIN_PASSWORD)
 }

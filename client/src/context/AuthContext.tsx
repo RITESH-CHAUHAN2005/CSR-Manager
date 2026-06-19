@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isViewer,
       canWrite,
       canCreate: canWrite,
-      canSeeDashboard: role === 'admin' || role === 'viewer',
+      canSeeDashboard: !!role, // every signed-in role can see the Dashboard
       login,
       logout,
     }
@@ -71,7 +71,7 @@ export function useAuth() {
 }
 
 // Where each role lands after login / when hitting an unauthorized route.
-export function homePathForRole(role: Role | null): string {
-  if (role === 'editor') return '/my-dashboard'
-  return '/dashboard' // admin + viewer
+// Every role can see the Dashboard, so it is the common home.
+export function homePathForRole(_role: Role | null): string {
+  return '/dashboard'
 }

@@ -26,65 +26,91 @@ const DATA_PAGES = [
 const ADMIN_PANEL = { to: '/admin', label: 'Admin Panel', icon: Gauge }
 const MY_DASHBOARD = { to: '/my-dashboard', label: 'My Dashboard', icon: UserCircle }
 
-export default function Sidebar() {
+export default function Sidebar({
+  mobileOpen = false,
+  onClose,
+}: {
+  mobileOpen?: boolean
+  onClose?: () => void
+}) {
   const { user, logout, role } = useAuth()
 
   // Per-role navigation:
   //   admin  — Dashboard + data pages + Admin Panel
-  //   editor — data pages + My Dashboard (no Dashboard, no Admin Panel)
+  //   editor — Dashboard + data pages + My Dashboard (no Admin Panel)
   //   viewer — Dashboard + data pages (read-only)
   const nav =
     role === 'admin'
       ? [DASHBOARD, ...DATA_PAGES, ADMIN_PANEL]
       : role === 'editor'
-        ? [...DATA_PAGES, MY_DASHBOARD]
+        ? [DASHBOARD, ...DATA_PAGES, MY_DASHBOARD]
         : [DASHBOARD, ...DATA_PAGES]
 
   return (
-    <aside className="flex h-screen w-64 flex-shrink-0 flex-col bg-sidebar text-slate-200">
-      {/* Logo */}
-      <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
-          <Building2 size={20} />
-        </div>
-        <span className="text-lg font-semibold tracking-tight text-white">CSR Manager</span>
-      </div>
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          aria-hidden
+        />
+      )}
 
-      {/* Nav */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {nav.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              [
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-slate-300 hover:bg-sidebar-hover hover:text-white',
-              ].join(' ')
-            }
+      <aside
+        className={[
+          'fixed inset-y-0 left-0 z-40 flex h-screen w-64 flex-shrink-0 flex-col bg-sidebar text-slate-200 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        ].join(' ')}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white">
+            <Building2 size={20} />
+          </div>
+          <span className="text-lg font-semibold tracking-tight text-white">CSR Manager</span>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {nav.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              onClick={onClose}
+              className={({ isActive }) =>
+                [
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-slate-300 hover:bg-sidebar-hover hover:text-white',
+                ].join(' ')
+              }
+            >
+              <Icon size={18} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* User / logout */}
+        <div className="border-t border-white/10 px-3 py-4">
+          <div className="mb-2 px-3">
+            <p className="truncate text-sm font-medium text-white">{user?.name}</p>
+            <p className="text-xs capitalize text-slate-400">{user?.role}</p>
+          </div>
+          <button
+            onClick={() => {
+              onClose?.()
+              logout()
+            }}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-sidebar-hover hover:text-white"
           >
-            <Icon size={18} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* User / logout */}
-      <div className="border-t border-white/10 px-3 py-4">
-        <div className="mb-2 px-3">
-          <p className="truncate text-sm font-medium text-white">{user?.name}</p>
-          <p className="text-xs capitalize text-slate-400">{user?.role}</p>
+            <LogOut size={18} />
+            Sign out
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-sidebar-hover hover:text-white"
-        >
-          <LogOut size={18} />
-          Sign out
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   )
 }

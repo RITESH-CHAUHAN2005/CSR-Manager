@@ -76,14 +76,12 @@ export default function Login() {
         </form>
 
         <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-          <p className="font-medium text-slate-600">Demo credentials</p>
-          <p>Admin — admin@csr.com / Admin@123 (full access)</p>
-          <p>Editor — editor@csr.com / Editor@123 (add/edit, no dashboard)</p>
-          <p>Viewer — viewer@csr.com / Viewer@123 (read-only)</p>
+          <p className="font-medium text-slate-600">Administrator login</p>
+          <p>admin@csr.com / Admin@123</p>
         </div>
 
         <p className="mt-5 text-center text-xs text-slate-400">
-          Employee accounts are created by your administrator.
+          Editor &amp; viewer accounts are created by the administrator from the Admin Panel.
         </p>
       </div>
     </div>
