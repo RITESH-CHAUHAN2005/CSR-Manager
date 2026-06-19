@@ -1,16 +1,30 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import AppLayout from './components/AppLayout'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Companies from './pages/Companies'
-import FinancialYears from './pages/FinancialYears'
-import Projects from './pages/Projects'
-import FundReceipts from './pages/FundReceipts'
-import Expenditures from './pages/Expenditures'
-import Reports from './pages/Reports'
-import AdminPanel from './pages/AdminPanel'
-import UserDashboard from './pages/UserDashboard'
+
+// Route-based code splitting: each page is emitted as its own hashed chunk under
+// /assets (e.g. Dashboard-XXXX.js) and fetched on demand, instead of one giant
+// bundle. This is the standard React production structure and keeps the initial
+// load small.
+const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Companies = lazy(() => import('./pages/Companies'))
+const FinancialYears = lazy(() => import('./pages/FinancialYears'))
+const Projects = lazy(() => import('./pages/Projects'))
+const FundReceipts = lazy(() => import('./pages/FundReceipts'))
+const Expenditures = lazy(() => import('./pages/Expenditures'))
+const Reports = lazy(() => import('./pages/Reports'))
+const AdminPanel = lazy(() => import('./pages/AdminPanel'))
+const UserDashboard = lazy(() => import('./pages/UserDashboard'))
+
+function PageFallback() {
+  return (
+    <div className="flex h-screen items-center justify-center bg-canvas text-slate-500">
+      Loading…
+    </div>
+  )
+}
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { isAuthenticated } = useAuth()
@@ -30,6 +44,7 @@ export default function App() {
   }
 
   return (
+    <Suspense fallback={<PageFallback />}>
     <Routes>
       <Route
         path="/login"
@@ -54,5 +69,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </Suspense>
   )
 }
