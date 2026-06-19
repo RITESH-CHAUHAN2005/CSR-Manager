@@ -1,15 +1,33 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Clock, Search, Share, Trash2, UsersThree, X } from '../components/icons'
+import { Search, Share, Trash2, UsersThree } from '../components/icons'
 import { logService, userAdminService } from '../services/dataService'
-import type { AuditLogEntry, ManagedUser } from '../types'
-import { Card, ConfirmDialog, PageHeader, Select, StatusBadge } from '../components/ui'
+import type { AuditLogEntry, ManagedUser, NewUserInput } from '../types'
+import {
+  Card,
+  ConfirmDialog,
+  Field,
+  FormSelect,
+  PageHeader,
+  PrimaryButton,
+  Select,
+  TextInput,
+} from '../components/ui'
+import { getErrorMessage } from '../lib/errors'
 import { describeLog, formatTimestamp, shareLog } from '../lib/activity'
 
 function companyName(c: ManagedUser['companyId']): string {
   if (!c) return '—'
   if (typeof c === 'string') return c
   return c.name ?? '—'
+}
+
+const emptyUser: NewUserInput = { name: '', email: '', password: '', role: 'editor' }
+
+const roleBadge: Record<string, string> = {
+  admin: 'bg-primary/10 text-primary',
+  editor: 'bg-accent/10 text-accent-dark',
+  viewer: 'bg-slate-100 text-slate-600',
 }
 
 export default function AdminPanel() {
@@ -21,6 +39,9 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('')
   const [shareNote, setShareNote] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [form, setForm] = useState<NewUserInput>(emptyUser)
+  const [formError, setFormError] = useState('')
+  const [formOk, setFormOk] = useState('')
 
   const { data: logs = [] } = useQuery({
     queryKey: ['logs', actionFilter, userFilter],
@@ -35,22 +56,32 @@ export default function AdminPanel() {
     qc.invalidateQueries({ queryKey: ['users'] })
     qc.invalidateQueries({ queryKey: ['logs'] })
   }
-  const approveM = useMutation({ mutationFn: userAdminService.approve, onSuccess: invalidateUsers })
-  const rejectM = useMutation({ mutationFn: userAdminService.reject, onSuccess: invalidateUsers })
+  const createM = useMutation({ mutationFn: userAdminService.create, onSuccess: invalidateUsers })
   const deleteM = useMutation({ mutationFn: userAdminService.remove, onSuccess: invalidateUsers })
 
-  const pending = users.filter((u) => u.status === 'pending')
-  const approvedCount = users.filter((u) => u.status === 'approved').length
+  const editorCount = users.filter((u) => u.role === 'editor').length
+  const viewerCount = users.filter((u) => u.role === 'viewer').length
 
   const filteredLogs = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return logs
     return logs.filter(
-      (l) =>
-        l.userEmail.toLowerCase().includes(q) ||
-        describeLog(l).toLowerCase().includes(q),
+      (l) => l.userEmail.toLowerCase().includes(q) || describeLog(l).toLowerCase().includes(q),
     )
   }, [logs, search])
+
+  async function onCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError('')
+    setFormOk('')
+    try {
+      const u = await createM.mutateAsync(form)
+      setFormOk(`${u.email} created as ${u.role}.`)
+      setForm(emptyUser)
+    } catch (err) {
+      setFormError(getErrorMessage(err, 'Could not create user'))
+    }
+  }
 
   async function onShare(log: AuditLogEntry) {
     const result = await shareLog(log)
@@ -60,42 +91,63 @@ export default function AdminPanel() {
 
   return (
     <>
-      <PageHeader
-        title="Admin Panel"
-        subtitle="User management & live activity logs"
-      />
+      <PageHeader title="Admin Panel" subtitle="User management & live activity logs" />
 
       {/* Stat cards */}
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <Stat label="Total Users" value={String(users.length)} icon={<UsersThree size={18} />} />
-        <Stat label="Approved" value={String(approvedCount)} icon={<Check size={18} />} />
-        <Stat label="Pending Approval" value={String(pending.length)} icon={<Clock size={18} />} accent />
+        <Stat label="Editors" value={String(editorCount)} />
+        <Stat label="Viewers" value={String(viewerCount)} />
       </div>
 
-      {/* Pending approvals */}
-      {pending.length > 0 && (
-        <Card className="mb-6 p-5">
-          <h2 className="mb-4 font-semibold text-slate-800">Pending Approvals</h2>
-          <div className="space-y-3">
-            {pending.map((u) => (
-              <div key={u.id} className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50/50 px-4 py-3">
-                <div>
-                  <p className="font-medium text-slate-800">{u.name}</p>
-                  <p className="text-sm text-slate-500">{u.email} · {companyName(u.companyId)}</p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => approveM.mutate(u.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-success px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
-                    <Check size={15} /> Approve
-                  </button>
-                  <button onClick={() => rejectM.mutate(u.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
-                    <X size={15} /> Reject
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* Create user */}
+      <Card className="mb-6 p-5">
+        <h2 className="mb-4 font-semibold text-slate-800">Add Employee Account</h2>
+        <form onSubmit={onCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Full Name">
+            <TextInput
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Jane Doe"
+            />
+          </Field>
+          <Field label="Email">
+            <TextInput
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="jane@company.com"
+            />
+          </Field>
+          <Field label="Password">
+            <TextInput
+              type="password"
+              required
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Min 8 chars, 1 letter + 1 number"
+            />
+          </Field>
+          <Field label="Role">
+            <FormSelect
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value as NewUserInput['role'] })}
+            >
+              <option value="editor">Editor — add / edit / delete</option>
+              <option value="viewer">Viewer — read-only</option>
+            </FormSelect>
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-4 flex flex-wrap items-center gap-3">
+            <PrimaryButton type="submit" disabled={createM.isPending}>
+              {createM.isPending ? 'Creating…' : 'Create User'}
+            </PrimaryButton>
+            {formError && <span className="text-sm text-danger">{formError}</span>}
+            {formOk && <span className="text-sm text-success">{formOk}</span>}
           </div>
-        </Card>
-      )}
+        </form>
+      </Card>
 
       {/* All users */}
       <Card className="mb-6 overflow-hidden">
@@ -107,7 +159,6 @@ export default function AdminPanel() {
               <th className="px-5 py-3 font-medium">Email</th>
               <th className="px-5 py-3 font-medium">Role</th>
               <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
@@ -116,18 +167,36 @@ export default function AdminPanel() {
               <tr key={u.id} className="border-b border-slate-100 last:border-0">
                 <td className="px-5 py-3 font-medium text-slate-800">{u.name}</td>
                 <td className="px-5 py-3 text-slate-600">{u.email}</td>
-                <td className="px-5 py-3 capitalize text-slate-500">{u.role}</td>
+                <td className="px-5 py-3">
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
+                      roleBadge[u.role] ?? 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {u.role}
+                  </span>
+                </td>
                 <td className="px-5 py-3 text-slate-500">{companyName(u.companyId)}</td>
-                <td className="px-5 py-3"><StatusBadge status={u.status} /></td>
                 <td className="px-5 py-3 text-right">
                   {u.role !== 'admin' && (
-                    <button onClick={() => setDeleteId(u.id)} className="text-slate-400 hover:text-danger">
+                    <button
+                      onClick={() => setDeleteId(u.id)}
+                      className="text-slate-400 hover:text-danger"
+                      title="Delete user"
+                    >
                       <Trash2 size={16} />
                     </button>
                   )}
                 </td>
               </tr>
             ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
+                  No users yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
@@ -155,14 +224,13 @@ export default function AdminPanel() {
             <option value="update">Update</option>
             <option value="delete">Delete</option>
             <option value="login">Login</option>
-            <option value="register">Register</option>
-            <option value="approve">Approve</option>
-            <option value="reject">Reject</option>
           </Select>
           <Select value={userFilter} onChange={(e) => setUserFilter(e.target.value)}>
             <option value="">All Users</option>
             {users.map((u) => (
-              <option key={u.id} value={u.email}>{u.email}</option>
+              <option key={u.id} value={u.email}>
+                {u.email}
+              </option>
             ))}
           </Select>
         </div>
@@ -181,12 +249,18 @@ export default function AdminPanel() {
             <tbody>
               {filteredLogs.map((l) => (
                 <tr key={l.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatTimestamp(l.createdAt)}</td>
+                  <td className="px-3 py-3 whitespace-nowrap text-slate-500">
+                    {formatTimestamp(l.createdAt)}
+                  </td>
                   <td className="px-3 py-3 text-slate-700">{l.userEmail}</td>
                   <td className="px-3 py-3 capitalize text-slate-500">{l.userRole ?? '—'}</td>
                   <td className="px-3 py-3 text-slate-700">{describeLog(l)}</td>
                   <td className="px-3 py-3 text-right">
-                    <button onClick={() => onShare(l)} title="Share this log" className="text-slate-400 hover:text-primary">
+                    <button
+                      onClick={() => onShare(l)}
+                      title="Share this log"
+                      className="text-slate-400 hover:text-primary"
+                    >
                       <Share size={16} />
                     </button>
                   </td>
@@ -194,7 +268,9 @@ export default function AdminPanel() {
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-slate-400">No activity yet.</td>
+                  <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
+                    No activity yet.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -216,14 +292,14 @@ export default function AdminPanel() {
   )
 }
 
-function Stat({ label, value, icon, accent }: { label: string; value: string; icon: React.ReactNode; accent?: boolean }) {
+function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <Card className="p-5">
       <div className="flex items-start justify-between">
         <p className="text-sm text-slate-500">{label}</p>
-        <span className={accent ? 'text-accent' : 'text-primary'}>{icon}</span>
+        {icon && <span className="text-primary">{icon}</span>}
       </div>
-      <p className={`mt-2 text-2xl font-bold ${accent ? 'text-accent' : 'text-slate-900'}`}>{value}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
     </Card>
   )
 }

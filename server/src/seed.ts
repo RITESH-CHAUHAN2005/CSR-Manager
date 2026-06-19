@@ -30,29 +30,28 @@ export async function seedDatabase() {
   ])
 
   // --- Users (passwords hashed with bcrypt, cost 12) ---
+  // One admin (the only admin; created here, never via the API) plus a demo editor
+  // and a demo viewer so each role can be tried immediately. Admins manage further
+  // editor/viewer accounts from the Admin Panel.
   await User.create([
     {
       name: 'CSR Administrator',
       email: env.SEED_ADMIN_EMAIL,
       passwordHash: await bcrypt.hash(env.SEED_ADMIN_PASSWORD, 12),
       role: 'admin',
-      status: 'approved',
     },
     {
-      name: 'CSR Viewer',
-      email: env.SEED_USER_EMAIL,
-      passwordHash: await bcrypt.hash(env.SEED_USER_PASSWORD, 12),
-      role: 'user',
-      status: 'approved',
+      name: 'CSR Editor',
+      email: 'editor@csr.com',
+      passwordHash: await bcrypt.hash('Editor@123', 12),
+      role: 'editor',
       companyId: tcs._id,
     },
     {
-      // Demo employee awaiting approval — appears in the admin's pending-approvals list.
-      name: 'Amit Verma',
-      email: 'amit.verma@tcs.com',
-      passwordHash: await bcrypt.hash('Employee@123', 12),
-      role: 'user',
-      status: 'pending',
+      name: 'CSR Viewer',
+      email: 'viewer@csr.com',
+      passwordHash: await bcrypt.hash('Viewer@123', 12),
+      role: 'viewer',
       companyId: tcs._id,
     },
   ])
@@ -105,6 +104,7 @@ export async function seedDatabase() {
   ])
 
   console.log('✅ Seed complete:')
-  console.log('   Admin —', env.SEED_ADMIN_EMAIL)
-  console.log('   User  —', env.SEED_USER_EMAIL)
+  console.log('   Admin  —', env.SEED_ADMIN_EMAIL, '/', env.SEED_ADMIN_PASSWORD)
+  console.log('   Editor — editor@csr.com / Editor@123')
+  console.log('   Viewer — viewer@csr.com / Viewer@123')
 }

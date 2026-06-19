@@ -3,27 +3,15 @@ import type { Model } from 'mongoose'
 import type { ZodSchema } from 'zod'
 import { crudController } from '../controllers/crudController.js'
 import { authenticate } from '../middleware/auth.js'
-import { requireAdmin } from '../middleware/requireAdmin.js'
+import { requireWrite } from '../middleware/authorize.js'
 import { validateBody } from '../middleware/validate.js'
 import { auditLog } from '../middleware/audit.js'
 
-interface Options {
-  // When true, any authenticated (approved) user may CREATE — used for operational
-  // records (projects, fund receipts, expenditures). Edit/Delete stay admin-only.
-  allowUserCreate?: boolean
-}
-
 // Standard secured REST resource:
-//   reads        -> any authenticated user
-//   create       -> admin always; users too when allowUserCreate
-//   update/delete-> admin only (users can never edit existing data or delete records)
+//   reads         -> any authenticated user (admin / editor / viewer)
+//   create/update/delete -> admin + editor only (viewer is strictly read-only)
 // All writes are validated and audit-logged.
-export function entityRouter<T>(
-  model: Model<T>,
-  schema: ZodSchema,
-  entity: string,
-  opts: Options = {},
-) {
+export function entityRouter<T>(model: Model<T>, schema: ZodSchema, entity: string) {
   const c = crudController(model)
   const router = Router()
 
@@ -31,10 +19,9 @@ export function entityRouter<T>(
   router.get('/', c.list)
   router.get('/:id', c.get)
 
-  const createGuards = opts.allowUserCreate ? [] : [requireAdmin]
-  router.post('/', ...createGuards, validateBody(schema), auditLog(entity), c.create)
-  router.put('/:id', requireAdmin, validateBody(schema), auditLog(entity), c.update)
-  router.delete('/:id', requireAdmin, auditLog(entity), c.remove)
+  router.post('/', requireWrite, validateBody(schema), auditLog(entity), c.create)
+  router.put('/:id', requireWrite, validateBody(schema), auditLog(entity), c.update)
+  router.delete('/:id', requireWrite, auditLog(entity), c.remove)
 
   return router
 }

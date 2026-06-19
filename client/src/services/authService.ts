@@ -2,38 +2,28 @@
 //   - mock: validates against demoUsers, persists the user in localStorage.
 //   - api:  real JWT login; the token lives in an httpOnly cookie (never in JS),
 //           so session restore is done via GET /auth/me.
+// The role is whatever the account has — there is no role selector at login.
 import { api, setAuthToken, USE_API } from './api'
-import type { Role, User } from '../types'
+import type { User } from '../types'
 import { demoUsers } from '../mocks/seedData'
 
 const STORAGE_KEY = 'csr_auth_user'
 
-export interface RegisterInput {
-  name: string
-  email: string
-  password: string
-  companyId?: string
-}
-
 interface AuthService {
-  login(email: string, password: string, role: Role): Promise<User>
-  register(input: RegisterInput): Promise<string>
+  login(email: string, password: string): Promise<User>
   logout(): Promise<void>
   me(): Promise<User | null>
 }
 
 const mockAuth: AuthService = {
-  async login(email, password, role) {
+  async login(email, password) {
     const match = demoUsers.find(
-      (u) => u.email === email.trim().toLowerCase() && u.password === password && u.role === role,
+      (u) => u.email === email.trim().toLowerCase() && u.password === password,
     )
-    if (!match) throw new Error('Invalid credentials for the selected role.')
+    if (!match) throw new Error('Invalid email or password.')
     const user: User = { id: match.role, name: match.name, email: match.email, role: match.role }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     return user
-  },
-  async register() {
-    return 'Registration received (demo mode). Use the live API for real approvals.'
   },
   async logout() {
     localStorage.removeItem(STORAGE_KEY)
@@ -49,19 +39,14 @@ const mockAuth: AuthService = {
 }
 
 const apiAuth: AuthService = {
-  async login(email, password, role) {
+  async login(email, password) {
     const res = await api.post<{ user: User; token?: string }>('/auth/login', {
       email: email.trim().toLowerCase(),
       password,
-      role,
     })
     // Persist the token for the Bearer-header fallback (split-domain deploys).
     if (res.data.token) setAuthToken(res.data.token)
     return res.data.user
-  },
-  async register(input) {
-    const res = await api.post<{ message: string }>('/auth/register', input)
-    return res.data.message
   },
   async logout() {
     try {

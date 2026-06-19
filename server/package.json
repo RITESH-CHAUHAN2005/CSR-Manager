@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "seed": "tsx src/seedCli.ts",
+    "clean": "tsx src/cleanDb.ts",
     "test": "tsx test/smoke.mts",
     "typecheck": "tsc --noEmit"
   },

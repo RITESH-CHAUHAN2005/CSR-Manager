@@ -237,12 +237,12 @@ export const analyticsService = {
 }
 
 // --- Mock stubs for admin users + logs (only meaningful with the live API) ---
-import type { AuditLogEntry, ManagedUser } from '../types'
+import type { AuditLogEntry, ManagedUser, NewUserInput } from '../types'
 
 export const userAdminService = {
   list: (): Promise<ManagedUser[]> => delay([]),
-  approve: (id: string) => delay({ id } as unknown as ManagedUser),
-  reject: (id: string) => delay({ id } as unknown as ManagedUser),
+  create: (data: NewUserInput) =>
+    delay({ id: nextId('u'), createdAt: '', ...data } as unknown as ManagedUser),
   remove: (id: string) => delay({ id }),
 }
 

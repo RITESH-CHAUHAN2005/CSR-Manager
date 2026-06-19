@@ -1,14 +1,12 @@
 // Domain types — shared across the app. Mirror the backend Mongoose models (Phase 3).
 
-export type Role = 'admin' | 'user'
-export type UserStatus = 'pending' | 'approved' | 'rejected'
+export type Role = 'admin' | 'editor' | 'viewer'
 
 export interface User {
   id: string
   name: string
   email: string
   role: Role
-  status?: UserStatus
   companyId?: string
 }
 
@@ -25,9 +23,16 @@ export interface ManagedUser {
   name: string
   email: string
   role: Role
-  status: UserStatus
   companyId?: { id: string; name: string } | string | null
   createdAt: string
+}
+
+// Payload to create an editor/viewer account from the Admin Panel.
+export interface NewUserInput {
+  name: string
+  email: string
+  password: string
+  role: 'editor' | 'viewer'
 }
 
 // Activity log entry.

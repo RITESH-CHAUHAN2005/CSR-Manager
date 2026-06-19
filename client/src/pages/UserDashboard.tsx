@@ -7,7 +7,7 @@ import {
   projectService,
 } from '../services/dataService'
 import { useAuth } from '../context/AuthContext'
-import { Card, PageHeader, StatusBadge } from '../components/ui'
+import { Card, PageHeader } from '../components/ui'
 import { formatINR } from '../lib/currency'
 import { describeLog, formatTimestamp } from '../lib/activity'
 
@@ -38,8 +38,10 @@ export default function UserDashboard() {
           <p className="text-sm text-slate-500">{user?.email}</p>
         </div>
         <div className="text-right">
-          <p className="mb-1 text-xs text-slate-400">Account</p>
-          <StatusBadge status={user?.status ?? 'approved'} />
+          <p className="mb-1 text-xs text-slate-400">Role</p>
+          <span className="inline-flex rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium capitalize text-accent-dark">
+            {user?.role ?? 'editor'}
+          </span>
         </div>
       </Card>
 

@@ -155,8 +155,10 @@ export const expenditures: Expenditure[] = [
   { id: 'e14', date: '2024-11-28', projectId: 'p7', companyId: 'c1', financialYearId: 'fy3', category: 'Equipment', approvedBy: 'Trustee Board', amount: 700000 },
 ]
 
-// Demo credentials for the login screen (Phase 4 replaces with real JWT auth).
+// Demo credentials for the login screen (mock mode). The live API uses real JWT auth
+// against the seeded MongoDB accounts (same emails/passwords).
 export const demoUsers = [
   { email: 'admin@csr.com', password: 'Admin@123', role: 'admin' as const, name: 'CSR Administrator' },
-  { email: 'user@csr.com', password: 'User@123', role: 'user' as const, name: 'CSR Viewer' },
+  { email: 'editor@csr.com', password: 'Editor@123', role: 'editor' as const, name: 'CSR Editor' },
+  { email: 'viewer@csr.com', password: 'Viewer@123', role: 'viewer' as const, name: 'CSR Viewer' },
 ]

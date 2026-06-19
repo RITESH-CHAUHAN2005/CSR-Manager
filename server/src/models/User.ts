@@ -4,15 +4,17 @@ import bcrypt from 'bcryptjs'
 const MAX_LOGIN_ATTEMPTS = 5
 const LOCK_TIME_MS = 15 * 60 * 1000 // 15 minutes
 
-export type Role = 'admin' | 'user'
-export type UserStatus = 'pending' | 'approved' | 'rejected'
+// Three roles:
+//   admin  — full access: all pages, all CRUD, user management, exports.
+//   editor — create/update/delete on all data pages; NO Dashboard, NO Admin Panel.
+//   viewer — read-only on all pages (incl. Dashboard); no write actions at all.
+export type Role = 'admin' | 'editor' | 'viewer'
 
 export interface IUser extends Document {
   name: string
   email: string
   passwordHash: string
   role: Role
-  status: UserStatus
   companyId?: mongoose.Types.ObjectId
   loginAttempts: number
   lockUntil?: number
@@ -37,8 +39,7 @@ const userSchema = new Schema<IUser>(
       index: true,
     },
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true },
+    role: { type: String, enum: ['admin', 'editor', 'viewer'], default: 'viewer' },
     companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Number },

@@ -13,8 +13,9 @@ import {
 } from './icons'
 import { useAuth } from '../context/AuthContext'
 
-const NAV = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+const DASHBOARD = { to: '/dashboard', label: 'Dashboard', icon: LayoutGrid }
+// Data pages — visible to every role.
+const DATA_PAGES = [
   { to: '/companies', label: 'Companies', icon: Building2 },
   { to: '/financial-years', label: 'Financial Years', icon: CalendarDays },
   { to: '/projects', label: 'Projects', icon: Briefcase },
@@ -22,17 +23,22 @@ const NAV = [
   { to: '/expenditures', label: 'Expenditures', icon: Receipt },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]
+const ADMIN_PANEL = { to: '/admin', label: 'Admin Panel', icon: Gauge }
+const MY_DASHBOARD = { to: '/my-dashboard', label: 'My Dashboard', icon: UserCircle }
 
 export default function Sidebar() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, role } = useAuth()
 
-  // Role-specific dashboard shown below Reports.
-  const nav = [
-    ...NAV,
-    isAdmin
-      ? { to: '/admin', label: 'Admin Panel', icon: Gauge }
-      : { to: '/my-dashboard', label: 'My Dashboard', icon: UserCircle },
-  ]
+  // Per-role navigation:
+  //   admin  — Dashboard + data pages + Admin Panel
+  //   editor — data pages + My Dashboard (no Dashboard, no Admin Panel)
+  //   viewer — Dashboard + data pages (read-only)
+  const nav =
+    role === 'admin'
+      ? [DASHBOARD, ...DATA_PAGES, ADMIN_PANEL]
+      : role === 'editor'
+        ? [...DATA_PAGES, MY_DASHBOARD]
+        : [DASHBOARD, ...DATA_PAGES]
 
   return (
     <aside className="flex h-screen w-64 flex-shrink-0 flex-col bg-sidebar text-slate-200">

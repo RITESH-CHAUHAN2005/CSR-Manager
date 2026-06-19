@@ -25,14 +25,12 @@ api.use('/auth', authRoutes)
 api.use('/users', userRoutes)
 api.use('/logs', logRoutes)
 
-// Master data — admin-only writes.
+// All data resources: read = any role; create/update/delete = admin + editor.
 api.use('/companies', entityRouter(Company, companySchema, 'company'))
 api.use('/financial-years', entityRouter(FinancialYear, financialYearSchema, 'financialYear'))
-
-// Operational records — approved users may also create (edit/delete still admin-only).
-api.use('/projects', entityRouter(Project, projectSchema, 'project', { allowUserCreate: true }))
-api.use('/fund-receipts', entityRouter(FundReceipt, fundReceiptSchema, 'fundReceipt', { allowUserCreate: true }))
-api.use('/expenditures', entityRouter(Expenditure, expenditureSchema, 'expenditure', { allowUserCreate: true }))
+api.use('/projects', entityRouter(Project, projectSchema, 'project'))
+api.use('/fund-receipts', entityRouter(FundReceipt, fundReceiptSchema, 'fundReceipt'))
+api.use('/expenditures', entityRouter(Expenditure, expenditureSchema, 'expenditure'))
 
 api.use('/', analyticsRoutes)
 

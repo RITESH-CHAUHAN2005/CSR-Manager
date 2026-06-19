@@ -11,12 +11,12 @@ import { clearAuthCookie, setAuthCookie, signToken } from '../utils/token.js'
 const DUMMY_HASH = '$2a$12$w.QHer3KyFbA04iUJMEUiOGi6Dc/kOpvH0zpybMjYZMg6BwCdPPBK'
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password, role } = req.body as { email: string; password: string; role: string }
+  const { email, password } = req.body as { email: string; password: string }
 
   const user = await User.findOne({ email: email.toLowerCase() }).select('+passwordHash')
 
   // Generic error message — never reveal whether the email exists.
-  const invalid = () => new ApiError(401, 'Invalid credentials for the selected role')
+  const invalid = () => new ApiError(401, 'Invalid email or password')
 
   const recordFail = (id?: string) =>
     AuditLog.create({
@@ -42,21 +42,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const ok = await user.comparePassword(password)
-  if (!ok || user.role !== role) {
+  if (!ok) {
     await User.recordFailedLogin(user._id as never)
     await recordFail(String(user._id))
     throw invalid()
-  }
-
-  // Self-registered employees must be approved by an admin before they can sign in.
-  if (user.status !== 'approved') {
-    await recordFail(String(user._id))
-    throw new ApiError(
-      403,
-      user.status === 'pending'
-        ? 'Your account is awaiting admin approval.'
-        : 'Your account request was rejected. Please contact the administrator.',
-    )
   }
 
   await User.resetLoginAttempts(user._id as never)
@@ -84,52 +73,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   // cookie; split-domain clients (frontend and API on different hosts, where
   // third-party cookies may be blocked) send it back as a Bearer header.
   res.json({ user: user.toJSON(), token })
-})
-
-// Employee self-registration: creates a pending 'user' account. Admin must approve
-// before login is allowed. bcrypt cost 12. Never returns whether the email pre-existed.
-export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password, companyId } = req.body as {
-    name: string
-    email: string
-    password: string
-    companyId?: string
-  }
-
-  const existing = await User.findOne({ email: email.toLowerCase() })
-  if (existing) {
-    // Generic success-style message — don't reveal that the email is registered.
-    return res.status(202).json({
-      message: 'Registration received. If approved by an admin, you will be able to sign in.',
-    })
-  }
-
-  const user = await User.create({
-    name,
-    email: email.toLowerCase(),
-    passwordHash: await bcrypt.hash(password, 12),
-    role: 'user',
-    status: 'pending',
-    companyId: companyId || undefined,
-  })
-
-  AuditLog.create({
-    userId: user._id,
-    userEmail: user.email,
-    userRole: 'user',
-    action: 'register',
-    entity: 'user',
-    entityId: String(user._id),
-    label: user.name,
-    method: 'POST',
-    path: '/api/auth/register',
-    ip: req.ip,
-    statusCode: 202,
-  }).catch(() => {})
-
-  res.status(202).json({
-    message: 'Registration received. An admin will review and approve your account.',
-  })
 })
 
 export const logout = asyncHandler(async (_req: Request, res: Response) => {

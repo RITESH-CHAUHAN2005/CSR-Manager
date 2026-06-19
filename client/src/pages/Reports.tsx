@@ -21,11 +21,13 @@ import {
 import { formatINR, formatLakhAxis } from '../lib/currency'
 import { Card, PageHeader, Select } from '../components/ui'
 import { downloadCsv, printReport } from '../lib/exporters'
+import { useAuth } from '../context/AuthContext'
 
 type Tab = 'year' | 'company' | 'project'
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 
 export default function Reports() {
+  const { canWrite } = useAuth()
   const { data: companies = [] } = useQuery({ queryKey: ['companies'], queryFn: companyService.list })
   const { data: years = [] } = useQuery({ queryKey: ['financial-years'], queryFn: financialYearService.list })
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: projectService.list })
@@ -152,14 +154,16 @@ export default function Reports() {
       <PageHeader
         title="Financial Reports"
         action={
-          <div className="flex gap-3">
-            <button onClick={printReport} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
-              <FileText size={16} /> Export PDF
-            </button>
-            <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-dark">
-              <FileDown size={16} /> Export Excel
-            </button>
-          </div>
+          canWrite && (
+            <div className="flex gap-3">
+              <button onClick={printReport} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
+                <FileText size={16} /> Export PDF
+              </button>
+              <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-dark">
+                <FileDown size={16} /> Export Excel
+              </button>
+            </div>
+          )
         }
       />
 

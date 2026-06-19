@@ -10,6 +10,7 @@ import type {
   FinancialYear,
   FundReceipt,
   ManagedUser,
+  NewUserInput,
   Project,
   YearFundFlow,
 } from '../types'
@@ -39,8 +40,7 @@ export const analyticsService = {
 
 export const userAdminService = {
   list: () => api.get<ManagedUser[]>('/users').then((r) => r.data),
-  approve: (id: string) => api.patch<ManagedUser>(`/users/${id}/approve`).then((r) => r.data),
-  reject: (id: string) => api.patch<ManagedUser>(`/users/${id}/reject`).then((r) => r.data),
+  create: (data: NewUserInput) => api.post<ManagedUser>('/users', data).then((r) => r.data),
   remove: (id: string) => api.delete<{ id: string }>(`/users/${id}`).then((r) => r.data),
 }
 

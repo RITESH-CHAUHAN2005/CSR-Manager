@@ -4,14 +4,15 @@ const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id')
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected YYYY-MM-DD date')
 const money = z.coerce.number().min(0)
 
+// Login no longer takes a role — the role is whatever the account has in the DB.
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-  role: z.enum(['admin', 'user']),
 })
 
-// Employee self-registration. Password policy enforced here (production requirement).
-export const registerSchema = z.object({
+// Admin creates editor/viewer accounts (no self-registration). Password policy
+// enforced here (production requirement). Admins can never be created via the API.
+export const createUserSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
   password: z
@@ -19,6 +20,7 @@ export const registerSchema = z.object({
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Za-z]/, 'Password must contain a letter')
     .regex(/\d/, 'Password must contain a number'),
+  role: z.enum(['editor', 'viewer']),
   companyId: objectId.optional(),
 })
 

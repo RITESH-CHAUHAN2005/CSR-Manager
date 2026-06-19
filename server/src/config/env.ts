@@ -24,4 +24,21 @@ if (!parsed.success) {
 
 export const env = parsed.data
 export const isProd = env.NODE_ENV === 'production'
-export const allowedOrigins = env.CLIENT_ORIGIN.split(',').map((o) => o.trim())
+
+// Known production frontend(s) — always allowed for CORS regardless of the
+// CLIENT_ORIGIN env value, so a deploy keeps working without re-editing Render env.
+const PROD_FRONTENDS = ['https://firebrick-hedgehog-486591.hostingersite.com']
+// Local dev origins (Vite). Only trusted when NOT in production.
+const DEV_FRONTENDS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+
+export const allowedOrigins = Array.from(
+  new Set(
+    [
+      ...env.CLIENT_ORIGIN.split(','),
+      ...PROD_FRONTENDS,
+      ...(isProd ? [] : DEV_FRONTENDS),
+    ]
+      .map((o) => o.trim())
+      .filter(Boolean),
+  ),
+)

@@ -1,16 +1,18 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Role, User } from '../types'
-import { authService, type RegisterInput } from '../services/authService'
+import { authService } from '../services/authService'
 
 interface AuthState {
   user: User | null
   loading: boolean
   isAuthenticated: boolean
-  isAdmin: boolean
-  canWrite: boolean // admin: full CRUD
-  canCreate: boolean // admin or approved user: may create records
-  login: (email: string, password: string, role: Role) => Promise<void>
-  register: (input: RegisterInput) => Promise<string>
+  role: Role | null
+  isAdmin: boolean // full access incl. Admin Panel
+  isViewer: boolean // read-only
+  canWrite: boolean // admin + editor: create / update / delete
+  canCreate: boolean // alias of canWrite (kept for existing page code)
+  canSeeDashboard: boolean // admin + viewer (editors do not see the Dashboard)
+  login: (email: string, password: string) => Promise<User>
   logout: () => void
 }
 
@@ -28,13 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  async function login(email: string, password: string, role: Role) {
-    const u = await authService.login(email, password, role)
+  async function login(email: string, password: string) {
+    const u = await authService.login(email, password)
     setUser(u)
-  }
-
-  function register(input: RegisterInput) {
-    return authService.register(input)
+    return u
   }
 
   async function logout() {
@@ -42,20 +41,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
-  const value = useMemo<AuthState>(
-    () => ({
+  const value = useMemo<AuthState>(() => {
+    const role = user?.role ?? null
+    const isAdmin = role === 'admin'
+    const isViewer = role === 'viewer'
+    const canWrite = role === 'admin' || role === 'editor'
+    return {
       user,
       loading,
       isAuthenticated: !!user,
-      isAdmin: user?.role === 'admin',
-      canWrite: user?.role === 'admin',
-      canCreate: !!user, // any authenticated user may create operational records
+      role,
+      isAdmin,
+      isViewer,
+      canWrite,
+      canCreate: canWrite,
+      canSeeDashboard: role === 'admin' || role === 'viewer',
       login,
-      register,
       logout,
-    }),
-    [user, loading],
-  )
+    }
+  }, [user, loading])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
@@ -64,4 +68,10 @@ export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
+}
+
+// Where each role lands after login / when hitting an unauthorized route.
+export function homePathForRole(role: Role | null): string {
+  if (role === 'editor') return '/my-dashboard'
+  return '/dashboard' // admin + viewer
 }

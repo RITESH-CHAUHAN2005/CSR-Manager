@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useAuth } from './context/AuthContext'
+import { homePathForRole, useAuth } from './context/AuthContext'
+import type { Role } from './types'
 import AppLayout from './components/AppLayout'
 
 // Route-based code splitting: each page is emitted as its own hashed chunk under
@@ -31,8 +32,16 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />
 }
 
+// Restrict a route to specific roles. A signed-in user hitting a route they are not
+// allowed to see is bounced to their own home page (not shown an error).
+function RequireRole({ allow, children }: { allow: Role[]; children: JSX.Element }) {
+  const { role } = useAuth()
+  if (role && allow.includes(role)) return children
+  return <Navigate to={homePathForRole(role)} replace />
+}
+
 export default function App() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, role } = useAuth()
 
   // Wait for session restore (mock: localStorage, API: /auth/me) before routing.
   if (loading) {
@@ -48,7 +57,7 @@ export default function App() {
     <Routes>
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />}
+        element={isAuthenticated ? <Navigate to={homePathForRole(role)} replace /> : <Login />}
       />
       <Route
         element={
@@ -57,17 +66,42 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Dashboard — admin + viewer only (editors do not see it) */}
+        <Route
+          path="/dashboard"
+          element={
+            <RequireRole allow={['admin', 'viewer']}>
+              <Dashboard />
+            </RequireRole>
+          }
+        />
+        {/* Data pages — every role (write actions are gated inside each page) */}
         <Route path="/companies" element={<Companies />} />
         <Route path="/financial-years" element={<FinancialYears />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/fund-receipts" element={<FundReceipts />} />
         <Route path="/expenditures" element={<Expenditures />} />
         <Route path="/reports" element={<Reports />} />
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/my-dashboard" element={<UserDashboard />} />
+        {/* Admin Panel — admin only */}
+        <Route
+          path="/admin"
+          element={
+            <RequireRole allow={['admin']}>
+              <AdminPanel />
+            </RequireRole>
+          }
+        />
+        {/* My Dashboard — editor's personal view */}
+        <Route
+          path="/my-dashboard"
+          element={
+            <RequireRole allow={['admin', 'editor']}>
+              <UserDashboard />
+            </RequireRole>
+          }
+        />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to={homePathForRole(role)} replace />} />
     </Routes>
     </Suspense>
   )

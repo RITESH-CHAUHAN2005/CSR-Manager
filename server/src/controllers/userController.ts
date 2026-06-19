@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express'
+import bcrypt from 'bcryptjs'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { User } from '../models/User.js'
@@ -11,24 +12,56 @@ export const listUsers = asyncHandler(async (_req: Request, res: Response) => {
   res.json(users)
 })
 
-async function setStatus(
-  req: Request,
-  res: Response,
-  status: 'approved' | 'rejected',
-  action: 'approve' | 'reject',
-) {
-  const user = await User.findById(req.params.id)
-  if (!user) throw new ApiError(404, 'User not found')
-  if (user.role === 'admin') throw new ApiError(400, 'Admin accounts cannot be modified here')
+// Admin creates an editor or viewer account (no self-registration). Admin accounts
+// can never be created via the API — role is restricted to editor/viewer by the schema.
+export const createUser = asyncHandler(async (req: Request, res: Response) => {
+  const { name, email, password, role, companyId } = req.body as {
+    name: string
+    email: string
+    password: string
+    role: 'editor' | 'viewer'
+    companyId?: string
+  }
 
-  user.status = status
-  await user.save()
+  const existing = await User.findOne({ email: email.toLowerCase() })
+  if (existing) throw new ApiError(409, 'A user with this email already exists')
+
+  const user = await User.create({
+    name,
+    email: email.toLowerCase(),
+    passwordHash: await bcrypt.hash(password, 12),
+    role,
+    companyId: companyId || undefined,
+  })
 
   AuditLog.create({
     userId: req.user!.id,
     userEmail: req.user!.email,
     userRole: 'admin',
-    action,
+    action: 'create',
+    entity: 'user',
+    entityId: String(user._id),
+    label: `${user.name} (${user.email}) · ${role}`,
+    method: req.method,
+    path: req.originalUrl,
+    ip: req.ip,
+    statusCode: 201,
+  }).catch(() => {})
+
+  res.status(201).json(user.toJSON())
+})
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+  const user = await User.findById(req.params.id)
+  if (!user) throw new ApiError(404, 'User not found')
+  if (user.role === 'admin') throw new ApiError(400, 'Admin accounts cannot be deleted here')
+  await user.deleteOne()
+
+  AuditLog.create({
+    userId: req.user!.id,
+    userEmail: req.user!.email,
+    userRole: 'admin',
+    action: 'delete',
     entity: 'user',
     entityId: String(user._id),
     label: `${user.name} (${user.email})`,
@@ -38,16 +71,5 @@ async function setStatus(
     statusCode: 200,
   }).catch(() => {})
 
-  res.json(user.toJSON())
-}
-
-export const approveUser = asyncHandler((req, res) => setStatus(req, res, 'approved', 'approve'))
-export const rejectUser = asyncHandler((req, res) => setStatus(req, res, 'rejected', 'reject'))
-
-export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
-  const user = await User.findById(req.params.id)
-  if (!user) throw new ApiError(404, 'User not found')
-  if (user.role === 'admin') throw new ApiError(400, 'Admin accounts cannot be deleted here')
-  await user.deleteOne()
   res.json({ id: req.params.id })
 })
