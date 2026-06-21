@@ -375,7 +375,7 @@ export default function Reports() {
 
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm" id="myTable">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3 font-medium">Financial Year</th>
