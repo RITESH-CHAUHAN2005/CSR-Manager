@@ -14,7 +14,8 @@ import {
   TextInput,
 } from '../components/ui'
 import { getErrorMessage } from '../lib/errors'
-import { describeLog, formatTimestamp, shareLog } from '../lib/activity'
+import { describeLog, formatTimestamp, logDetails, shareLog } from '../lib/activity'
+import { useAuth } from '../context/AuthContext'
 
 function companyName(c: ManagedUser['companyId']): string {
   if (!c) return '—'
@@ -32,6 +33,7 @@ const roleBadge: Record<string, string> = {
 
 export default function AdminPanel() {
   const qc = useQueryClient()
+  const { user: currentUser } = useAuth()
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: userAdminService.list })
 
   const [actionFilter, setActionFilter] = useState('')
@@ -42,6 +44,7 @@ export default function AdminPanel() {
   const [form, setForm] = useState<NewUserInput>(emptyUser)
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const { data: logs = [] } = useQuery({
     queryKey: ['logs', actionFilter, userFilter],
@@ -57,8 +60,13 @@ export default function AdminPanel() {
     qc.invalidateQueries({ queryKey: ['logs'] })
   }
   const createM = useMutation({ mutationFn: userAdminService.create, onSuccess: invalidateUsers })
-  const deleteM = useMutation({ mutationFn: userAdminService.remove, onSuccess: invalidateUsers })
+  const deleteM = useMutation({
+    mutationFn: userAdminService.remove,
+    onSuccess: invalidateUsers,
+    onError: (err) => setDeleteError(getErrorMessage(err, 'Could not delete user')),
+  })
 
+  const adminCount = users.filter((u) => u.role === 'admin').length
   const editorCount = users.filter((u) => u.role === 'editor').length
   const viewerCount = users.filter((u) => u.role === 'viewer').length
 
@@ -94,15 +102,16 @@ export default function AdminPanel() {
       <PageHeader title="Admin Panel" subtitle="User management & live activity logs" />
 
       {/* Stat cards */}
-      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Total Users" value={String(users.length)} icon={<UsersThree size={18} />} />
+        <Stat label="Admins" value={String(adminCount)} />
         <Stat label="Editors" value={String(editorCount)} />
         <Stat label="Viewers" value={String(viewerCount)} />
       </div>
 
       {/* Create user */}
       <Card className="mb-6 p-5">
-        <h2 className="mb-4 font-semibold text-slate-800">Add Employee Account</h2>
+        <h2 className="mb-4 font-semibold text-slate-800">Add User Account</h2>
         <form onSubmit={onCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Full Name">
             <TextInput
@@ -135,6 +144,7 @@ export default function AdminPanel() {
               value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value as NewUserInput['role'] })}
             >
+              <option value="admin">Admin — full access + user management</option>
               <option value="editor">Editor — add / edit / delete</option>
               <option value="viewer">Viewer — read-only</option>
             </FormSelect>
@@ -151,8 +161,12 @@ export default function AdminPanel() {
 
       {/* All users */}
       <Card className="mb-6 overflow-hidden">
-        <h2 className="px-5 pt-5 font-semibold text-slate-800">All Users</h2>
-        <table className="mt-3 w-full text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
+          <h2 className="font-semibold text-slate-800">All Users</h2>
+          {deleteError && <span className="text-sm text-danger">{deleteError}</span>}
+        </div>
+        <div className="overflow-x-auto">
+        <table className="mt-3 w-full min-w-[600px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
               <th className="px-5 py-3 font-medium">Name</th>
@@ -178,7 +192,9 @@ export default function AdminPanel() {
                 </td>
                 <td className="px-5 py-3 text-slate-500">{companyName(u.companyId)}</td>
                 <td className="px-5 py-3 text-right">
-                  {u.role !== 'admin' && (
+                  {currentUser?.id === u.id ? (
+                    <span className="text-xs text-slate-400">You</span>
+                  ) : (
                     <button
                       onClick={() => setDeleteId(u.id)}
                       className="text-slate-400 hover:text-danger"
@@ -199,6 +215,7 @@ export default function AdminPanel() {
             )}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {/* Activity logs */}
@@ -208,14 +225,14 @@ export default function AdminPanel() {
           {shareNote && <span className="text-sm font-medium text-success">{shareNote}</span>}
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-3">
-          <div className="relative">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <div className="relative w-full sm:w-auto">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search activity…"
-              className="w-64 rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-64"
             />
           </div>
           <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
@@ -236,7 +253,7 @@ export default function AdminPanel() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
                 <th className="px-3 py-3 font-medium">When</th>
@@ -254,8 +271,11 @@ export default function AdminPanel() {
                   </td>
                   <td className="px-3 py-3 text-slate-700">{l.userEmail}</td>
                   <td className="px-3 py-3 capitalize text-slate-500">{l.userRole ?? '—'}</td>
-                  <td className="px-3 py-3 text-slate-700">{describeLog(l)}</td>
-                  <td className="px-3 py-3 text-right">
+                  <td className="px-3 py-3 align-top text-slate-700">
+                    <span className="font-medium capitalize">{describeLog(l)}</span>
+                    <LogDetails log={l} />
+                  </td>
+                  <td className="px-3 py-3 align-top text-right">
                     <button
                       onClick={() => onShare(l)}
                       title="Share this log"
@@ -284,11 +304,39 @@ export default function AdminPanel() {
         message="This permanently removes the user account."
         onCancel={() => setDeleteId(null)}
         onConfirm={() => {
+          setDeleteError('')
           if (deleteId) deleteM.mutate(deleteId)
           setDeleteId(null)
         }}
       />
     </>
+  )
+}
+
+// Field-level detail under each activity row: created values, before → after, or removed values.
+function LogDetails({ log }: { log: AuditLogEntry }) {
+  const details = logDetails(log)
+  if (details.length === 0) return null
+  const isUpdate = log.action === 'update'
+  return (
+    <ul className="mt-1.5 space-y-1 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
+      {details.map((d, i) => (
+        <li key={i} className="flex flex-wrap items-center gap-x-1.5">
+          <span className="font-medium text-slate-600">{d.label}:</span>
+          {isUpdate ? (
+            <>
+              <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through decoration-red-300">
+                {d.from}
+              </span>
+              <span className="text-slate-400">→</span>
+              <span className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">{d.to}</span>
+            </>
+          ) : (
+            <span className="text-slate-700">{d.value}</span>
+          )}
+        </li>
+      ))}
+    </ul>
   )
 }
 

@@ -10,8 +10,8 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 })
 
-// Admin creates editor/viewer accounts (no self-registration). Password policy
-// enforced here (production requirement). Admins can never be created via the API.
+// Admin creates admin/editor/viewer accounts (no self-registration). Password policy
+// enforced here (production requirement). An admin may now create additional admins.
 export const createUserSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
@@ -20,7 +20,7 @@ export const createUserSchema = z.object({
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Za-z]/, 'Password must contain a letter')
     .regex(/\d/, 'Password must contain a number'),
-  role: z.enum(['editor', 'viewer']),
+  role: z.enum(['admin', 'editor', 'viewer']),
   companyId: objectId.optional(),
 })
 

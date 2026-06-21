@@ -41,28 +41,21 @@ async function run() {
   // 2. Wrong password rejected
   r = await fetch(`${BASE}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@csr.com', password: 'wrong', role: 'admin' }),
+    body: JSON.stringify({ email: 'admin@csr.com', password: 'wrong' }),
   })
   check('login wrong password -> 401', r.status === 401, `got ${r.status}`)
 
   // 2b. Unknown email -> 401 (not 500); exercises the dummy-hash timing path
   r = await fetch(`${BASE}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'nobody@nowhere.com', password: 'whatever', role: 'admin' }),
+    body: JSON.stringify({ email: 'nobody@nowhere.com', password: 'whatever' }),
   })
   check('login unknown email -> 401', r.status === 401, `got ${r.status}`)
 
-  // 3. Role mismatch rejected (admin account, user role selected)
+  // 4. Admin login works (login takes email+password only — role comes from the DB)
   r = await fetch(`${BASE}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@csr.com', password: 'Admin@123', role: 'user' }),
-  })
-  check('login role mismatch -> 401', r.status === 401, `got ${r.status}`)
-
-  // 4. Admin login works
-  r = await fetch(`${BASE}/auth/login`, {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@csr.com', password: 'Admin@123', role: 'admin' }),
+    body: JSON.stringify({ email: 'admin@csr.com', password: 'Admin@123' }),
   })
   const adminCookie = cookieFrom(r)
   check('admin login -> 200 + cookie', r.status === 200 && !!adminCookie, `got ${r.status}`)
@@ -83,25 +76,32 @@ async function run() {
   check('FY2023-24 carryForwardIn = 2,80,000', fy2324?.carryForwardIn === 280000, `got ${fy2324?.carryForwardIn}`)
   check('FY2023-24 balance = 8,10,000', fy2324?.balance === 810000, `got ${fy2324?.balance}`)
 
-  // 7. User login + RBAC (read-only)
+  // 7. Viewer RBAC (read-only). Seed has only the admin, so the admin creates a
+  // viewer first (no self-registration), then we log in as that viewer.
+  r = await fetch(`${BASE}/users`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ name: 'Read Only', email: 'viewer@csr.com', password: 'Viewer@123', role: 'viewer' }),
+  })
+  check('admin creates viewer -> 201', r.status === 201, `got ${r.status}`)
+
   r = await fetch(`${BASE}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: 'user@csr.com', password: 'User@123', role: 'user' }),
+    body: JSON.stringify({ email: 'viewer@csr.com', password: 'Viewer@123' }),
   })
-  const userCookie = cookieFrom(r)
-  check('user login -> 200', r.status === 200, `got ${r.status}`)
+  const viewerCookie = cookieFrom(r)
+  check('viewer login -> 200', r.status === 200, `got ${r.status}`)
 
-  r = await fetch(`${BASE}/companies`, { headers: { cookie: userCookie } })
-  check('user can READ companies -> 200', r.status === 200, `got ${r.status}`)
+  r = await fetch(`${BASE}/companies`, { headers: { cookie: viewerCookie } })
+  check('viewer can READ companies -> 200', r.status === 200, `got ${r.status}`)
 
   const newCompany = JSON.stringify({
     name: 'Test Co', cin: 'U12345MH2020PLC000001', contactPerson: 'Tester',
     email: 'test@co.com', phone: '+91-99-99999999',
   })
   r = await fetch(`${BASE}/companies`, {
-    method: 'POST', headers: { 'content-type': 'application/json', cookie: userCookie }, body: newCompany,
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: viewerCookie }, body: newCompany,
   })
-  check('user WRITE blocked by RBAC -> 403', r.status === 403, `got ${r.status}`)
+  check('viewer WRITE blocked by RBAC -> 403', r.status === 403, `got ${r.status}`)
 
   // 8. Admin can write (validated)
   r = await fetch(`${BASE}/companies`, {
@@ -119,9 +119,34 @@ async function run() {
   // 10. NoSQL-injection style payload is sanitized (no crash, rejected by validation)
   r = await fetch(`${BASE}/auth/login`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: { $ne: null }, password: { $ne: null }, role: 'admin' }),
+    body: JSON.stringify({ email: { $ne: null }, password: { $ne: null } }),
   })
   check('NoSQL operator injection rejected -> 4xx', r.status >= 400 && r.status < 500, `got ${r.status}`)
+
+  // 11. Multiple-admin support: an admin can create another admin, who can log in.
+  r = await fetch(`${BASE}/users`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ name: 'Second Admin', email: 'admin2@csr.com', password: 'Admin2@123', role: 'admin' }),
+  })
+  const admin2 = await r.json()
+  check('admin creates a second admin -> 201', r.status === 201 && admin2.role === 'admin', `got ${r.status}`)
+
+  r = await fetch(`${BASE}/auth/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: 'admin2@csr.com', password: 'Admin2@123' }),
+  })
+  check('second admin can log in -> 200', r.status === 200, `got ${r.status}`)
+
+  // 12. Self-delete is blocked (need the acting admin's own id from the users list).
+  r = await fetch(`${BASE}/users`, { headers: { cookie: adminCookie } })
+  const allUsers = await r.json()
+  const selfId = allUsers.find((u: { email: string }) => u.email === 'admin@csr.com')?.id
+  r = await fetch(`${BASE}/users/${selfId}`, { method: 'DELETE', headers: { cookie: adminCookie } })
+  check('admin cannot delete own account -> 400', r.status === 400, `got ${r.status}`)
+
+  // 13. With two admins present, deleting the OTHER admin is allowed.
+  r = await fetch(`${BASE}/users/${admin2.id}`, { method: 'DELETE', headers: { cookie: adminCookie } })
+  check('admin can delete another admin -> 200', r.status === 200, `got ${r.status}`)
 }
 
 try {

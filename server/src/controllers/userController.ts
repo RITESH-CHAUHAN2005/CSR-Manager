@@ -12,14 +12,14 @@ export const listUsers = asyncHandler(async (_req: Request, res: Response) => {
   res.json(users)
 })
 
-// Admin creates an editor or viewer account (no self-registration). Admin accounts
-// can never be created via the API — role is restricted to editor/viewer by the schema.
+// Admin creates an admin, editor, or viewer account (no self-registration). An admin
+// may promote others to admin too — the schema permits role 'admin'.
 export const createUser = asyncHandler(async (req: Request, res: Response) => {
   const { name, email, password, role, companyId } = req.body as {
     name: string
     email: string
     password: string
-    role: 'editor' | 'viewer'
+    role: 'admin' | 'editor' | 'viewer'
     companyId?: string
   }
 
@@ -54,7 +54,19 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
 export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findById(req.params.id)
   if (!user) throw new ApiError(404, 'User not found')
-  if (user.role === 'admin') throw new ApiError(400, 'Admin accounts cannot be deleted here')
+
+  // You cannot delete your own account from here.
+  if (String(user._id) === req.user!.id) {
+    throw new ApiError(400, 'You cannot delete your own account')
+  }
+  // Never allow removing the last remaining admin — the app would be locked out.
+  if (user.role === 'admin') {
+    const adminCount = await User.countDocuments({ role: 'admin' })
+    if (adminCount <= 1) {
+      throw new ApiError(400, 'Cannot delete the last remaining admin')
+    }
+  }
+
   await user.deleteOne()
 
   AuditLog.create({

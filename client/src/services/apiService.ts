@@ -36,6 +36,11 @@ export const analyticsService = {
   yearWiseReport: () => api.get<YearFundFlow[]>('/reports/year-wise').then((r) => r.data),
   companyPositions: () =>
     api.get<CompanyFundPosition[]>('/reports/company-positions').then((r) => r.data),
+  // Streams a proper server-generated PDF/Excel of the chosen report as a Blob.
+  exportReport: (type: 'year' | 'company' | 'project', format: 'pdf' | 'excel'): Promise<Blob> =>
+    api
+      .get(`/reports/export/${format}`, { params: { type }, responseType: 'blob' })
+      .then((r) => r.data as Blob),
 }
 
 export const userAdminService = {

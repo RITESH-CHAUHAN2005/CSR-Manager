@@ -11,6 +11,7 @@ node_modules/
 dist/
 **/dist/
 build/
+*.zip
 
 # TypeScript incremental build info
 *.tsbuildinfo

@@ -20,7 +20,17 @@ export function downloadCsv(filename: string, headers: string[], rows: Cell[][])
   URL.revokeObjectURL(url)
 }
 
-// Uses the browser's print dialog (user can "Save as PDF").
+// Trigger a browser download for a Blob (e.g. a server-generated PDF/xlsx).
+export function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Fallback only: browser print dialog (used when the server export is unavailable).
 export function printReport() {
   window.print()
 }

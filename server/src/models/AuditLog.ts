@@ -10,6 +10,10 @@ export interface IAuditLog extends Document {
   entity: string
   entityId?: string
   label?: string
+  // Descriptive change detail for the activity feed:
+  before?: Record<string, unknown> // snapshot before a delete/update
+  after?: Record<string, unknown> // snapshot after a create/update
+  changes?: { field: string; from: unknown; to: unknown }[] // field-level diff on update
   method: string
   path: string
   ip?: string
@@ -25,6 +29,9 @@ const auditLogSchema = new Schema<IAuditLog>(
     entity: { type: String, required: true },
     entityId: { type: String },
     label: { type: String },
+    before: { type: Schema.Types.Mixed },
+    after: { type: Schema.Types.Mixed },
+    changes: { type: [Schema.Types.Mixed], default: undefined },
     method: { type: String, required: true },
     path: { type: String, required: true },
     ip: { type: String },

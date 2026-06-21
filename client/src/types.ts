@@ -27,12 +27,19 @@ export interface ManagedUser {
   createdAt: string
 }
 
-// Payload to create an editor/viewer account from the Admin Panel.
+// Payload to create an admin/editor/viewer account from the Admin Panel.
 export interface NewUserInput {
   name: string
   email: string
   password: string
-  role: 'editor' | 'viewer'
+  role: 'admin' | 'editor' | 'viewer'
+}
+
+// A single field-level change captured on an update.
+export interface FieldChange {
+  field: string
+  from: unknown
+  to: unknown
 }
 
 // Activity log entry.
@@ -44,6 +51,10 @@ export interface AuditLogEntry {
   entity: string
   entityId?: string
   label?: string
+  // Descriptive detail of the change (populated by the backend):
+  before?: Record<string, unknown> // snapshot before delete/update
+  after?: Record<string, unknown> // snapshot after create/update
+  changes?: FieldChange[] // what changed on an update
   method: string
   path: string
   ip?: string

@@ -111,7 +111,7 @@ export default function FundReceipts() {
         action={canCreate && <PrimaryButton onClick={openAdd}>Record Receipt</PrimaryButton>}
       />
 
-      <div className="mb-5 flex gap-3">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
           <option value="">All Companies</option>
           {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -124,7 +124,8 @@ export default function FundReceipts() {
       </div>
 
       <Card className="overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[820px] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
               <th className="px-5 py-3 font-medium">Date</th>
@@ -159,11 +160,12 @@ export default function FundReceipts() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Receipt' : 'Record Receipt'}>
         <form onSubmit={submit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Date">
               <TextInput type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </Field>

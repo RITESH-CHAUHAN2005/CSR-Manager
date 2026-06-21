@@ -234,6 +234,10 @@ export const analyticsService = {
   },
 
   companyPositions: () => delay(companyPositions()),
+
+  // Server-rendered PDF/Excel isn't available in standalone mock mode; callers fall back.
+  exportReport: (_type: 'year' | 'company' | 'project', _format: 'pdf' | 'excel'): Promise<Blob> =>
+    Promise.reject(new Error('Server export unavailable in offline mode')),
 }
 
 // --- Mock stubs for admin users + logs (only meaningful with the live API) ---

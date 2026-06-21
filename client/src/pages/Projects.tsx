@@ -120,7 +120,7 @@ export default function Projects() {
         action={canCreate && <PrimaryButton onClick={openAdd}>Add Project</PrimaryButton>}
       />
 
-      <div className="mb-5 flex gap-3">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
           <option value="">All Companies</option>
           {companies.map((c) => (
@@ -182,7 +182,7 @@ export default function Projects() {
           <Field label="Project Name">
             <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Company">
               <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}

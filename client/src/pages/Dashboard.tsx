@@ -107,7 +107,7 @@ export default function Dashboard() {
       <Card className="mt-6 p-5">
         <h2 className="mb-4 font-semibold text-slate-800">Company Fund Positions</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
                 <th className="pb-3 font-medium">Company</th>
