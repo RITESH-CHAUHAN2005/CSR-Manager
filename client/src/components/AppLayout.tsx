@@ -66,14 +66,11 @@ export default function AppLayout() {
               </span>
             </button>
 
-            <div className="flex items-center gap-2.5 rounded-xl border border-line bg-surface/60 py-1 pl-1 pr-3 shadow-sm">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-light text-xs font-semibold text-white">
-                {initials(user?.name)}
-              </div>
-              <div className="hidden leading-tight sm:block">
-                <p className="max-w-[140px] truncate text-sm font-medium text-ink">{user?.name}</p>
-                <p className="text-xs capitalize text-muted">{user?.role}</p>
-              </div>
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-light text-xs font-semibold text-white shadow-sm ring-1 ring-line"
+              title={user?.name}
+            >
+              {initials(user?.name)}
             </div>
           </div>
         </header>

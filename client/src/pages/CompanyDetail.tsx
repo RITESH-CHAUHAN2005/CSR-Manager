@@ -21,8 +21,11 @@ import {
   TextArea,
   TextInput,
 } from '../components/ui'
+import { DataTable, type DTColumn } from '../components/DataTable'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+const money = (d: unknown, type: string) => (type === 'display' ? formatINR(Number(d)) : Number(d))
+const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
 
 export default function CompanyDetail() {
   const { id = '' } = useParams()
@@ -67,6 +70,15 @@ export default function CompanyDetail() {
       })
       .filter((r) => r.received > 0 || r.carryForwardIn > 0 || r.expenditure > 0 || r.hasProject)
   }, [years, myReceipts, myExpenditures, myProjects])
+
+  const receiptRows = useMemo(
+    () =>
+      [...myReceipts]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((r) => ({ ...r, yearLabel: yearName(r.financialYearId) })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [myReceipts, years],
+  )
 
   // ---- Inline edit ----
   const [editOpen, setEditOpen] = useState(false)
@@ -188,32 +200,24 @@ export default function CompanyDetail() {
         {yearRows.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No fund activity recorded yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-3 py-3 font-medium">Financial Year</th>
-                  <th className="px-3 py-3 text-right font-medium">Received</th>
-                  <th className="px-3 py-3 text-right font-medium">Carry Forward In</th>
-                  <th className="px-3 py-3 text-right font-medium">Expenditure</th>
-                  <th className="px-3 py-3 text-right font-medium">Balance</th>
-                  <th className="px-3 py-3 text-right font-medium">Carry Forward Out</th>
-                </tr>
-              </thead>
-              <tbody>
-                {yearRows.map((r) => (
-                  <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
-                    <td className="px-3 py-3 font-medium text-ink/80">{r.name}</td>
-                    <td className="px-3 py-3 text-right text-ink/80">{formatINR(r.received)}</td>
-                    <td className="px-3 py-3 text-right text-muted">{formatINR(r.carryForwardIn)}</td>
-                    <td className="px-3 py-3 text-right text-danger">{formatINR(r.expenditure)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-success">{formatINR(r.balance)}</td>
-                    <td className="px-3 py-3 text-right text-muted">{formatINR(r.balance)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={yearRows}
+            columns={[
+              { data: 'name', title: 'Financial Year' },
+              { data: 'received', title: 'Received', className: 'text-right', render: money },
+              { data: 'carryForwardIn', title: 'Carry Forward In', className: 'text-right', render: money },
+              { data: 'expenditure', title: 'Expenditure', className: 'text-right' },
+              { data: 'balance', title: 'Balance', className: 'text-right' },
+              { data: 'balance', title: 'Carry Forward Out', className: 'text-right', render: money },
+            ] as DTColumn[]}
+            slots={{
+              3: (_cell, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
+              4: (_cell, row) => (
+                <span className="font-semibold text-success">{formatINR(row.balance)}</span>
+              ),
+            }}
+            options={{ searching: false, order: [] }}
+          />
         )}
       </Card>
 
@@ -248,34 +252,23 @@ export default function CompanyDetail() {
         {myReceipts.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted">No fund receipts yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-3 py-3 font-medium">Date</th>
-                  <th className="px-3 py-3 font-medium">Year</th>
-                  <th className="px-3 py-3 font-medium">Reference</th>
-                  <th className="px-3 py-3 font-medium">Mode</th>
-                  <th className="px-3 py-3 text-right font-medium">Carry Forward</th>
-                  <th className="px-3 py-3 text-right font-medium">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...myReceipts]
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map((r) => (
-                    <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
-                      <td className="px-3 py-3 text-ink/80">{formatDate(r.date)}</td>
-                      <td className="px-3 py-3 text-muted">{yearName(r.financialYearId)}</td>
-                      <td className="px-3 py-3 text-muted">{r.reference}</td>
-                      <td className="px-3 py-3 text-muted">{r.mode}</td>
-                      <td className="px-3 py-3 text-right text-muted">{formatINR(r.carryForward)}</td>
-                      <td className="px-3 py-3 text-right font-semibold text-success">{formatINR(r.amount)}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={receiptRows}
+            columns={[
+              { data: 'date', title: 'Date', render: dateCell },
+              { data: 'yearLabel', title: 'Year' },
+              { data: 'reference', title: 'Reference' },
+              { data: 'mode', title: 'Mode' },
+              { data: 'carryForward', title: 'Carry Forward', className: 'text-right', render: money },
+              { data: 'amount', title: 'Amount', className: 'text-right' },
+            ] as DTColumn[]}
+            slots={{
+              5: (_cell, row) => (
+                <span className="font-semibold text-success">{formatINR(row.amount)}</span>
+              ),
+            }}
+            options={{ searching: false, order: [] }}
+          />
         )}
       </Card>
 

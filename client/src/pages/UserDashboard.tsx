@@ -8,6 +8,7 @@ import {
 } from '../services/dataService'
 import { useAuth } from '../context/AuthContext'
 import { Card, PageHeader } from '../components/ui'
+import { DataTable, type DTColumn } from '../components/DataTable'
 import { formatINR } from '../lib/currency'
 import { describeLog, formatTimestamp } from '../lib/activity'
 
@@ -75,29 +76,24 @@ export default function UserDashboard() {
       </Card>
 
       {/* My activity */}
-      <Card className="p-5">
-        <h2 className="mb-4 font-semibold text-ink">My Activity</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
-                <th className="px-3 py-3 font-medium">When</th>
-                <th className="px-3 py-3 font-medium">Activity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myLogs.map((l) => (
-                <tr key={l.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]">
-                  <td className="px-3 py-3 whitespace-nowrap text-muted">{formatTimestamp(l.createdAt)}</td>
-                  <td className="px-3 py-3 text-ink/80">{describeLog(l)}</td>
-                </tr>
-              ))}
-              {myLogs.length === 0 && (
-                <tr><td colSpan={2} className="py-8 text-center text-sm text-muted">No activity yet.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <Card className="p-2 sm:p-4">
+        <h2 className="mb-4 px-3 pt-3 font-semibold text-ink">My Activity</h2>
+        <DataTable
+          data={myLogs.map((l) => ({
+            ...l,
+            activityLabel: describeLog(l),
+          }))}
+          columns={[
+            {
+              data: 'createdAt',
+              title: 'When',
+              render: (d: unknown, type: string) =>
+                type === 'display' ? formatTimestamp(String(d)) : d,
+            },
+            { data: 'activityLabel', title: 'Activity' },
+          ] as DTColumn[]}
+          options={{ order: [] }}
+        />
       </Card>
     </>
   )

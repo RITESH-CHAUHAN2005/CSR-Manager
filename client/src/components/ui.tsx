@@ -1,8 +1,24 @@
-import { useEffect, useRef, type ReactNode, type SelectHTMLAttributes } from 'react'
+import {
+  Children,
+  useEffect,
+  useMemo,
+  useRef,
+  type ChangeEvent,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from 'react'
 import flatpickr from 'flatpickr'
 import type { Instance } from 'flatpickr/dist/types/instance'
 import 'flatpickr/dist/flatpickr.min.css'
-import { ChevronDown, Plus, Search, X } from './icons'
+// jQuery must be global before Select2 attaches to $.fn.
+import $ from '../lib/jquery-global'
+import select2 from 'select2'
+import 'select2/dist/css/select2.min.css'
+import { Plus, Search, X } from './icons'
+
+// Install the Select2 plugin onto jQuery ($.fn.select2). Calling the installer
+// (rather than a bare side-effect import) prevents the bundler from tree-shaking it.
+select2()
 
 // ---------------- PageHeader ----------------
 export function PageHeader({
@@ -90,25 +106,114 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// ---------------- Select (filter dropdown) ----------------
-export function Select({
+// ---------------- Select2-backed dropdown ----------------
+// A jQuery Select2 widget that keeps the same (value / onChange / <option> children)
+// contract the pages already use, so every dropdown becomes a rounded, searchable,
+// theme-aware control without touching call sites.
+function Select2Base({
+  value,
+  onChange,
   children,
-  className = '',
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+  containerClassName = '',
+}: {
+  value?: string | number | readonly string[]
+  onChange?: React.ChangeEventHandler<HTMLSelectElement>
+  children: ReactNode
+  containerClassName?: string
+}) {
+  const ref = useRef<HTMLSelectElement>(null)
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
+  // Signature of the current <option>s — re-init Select2 when they change (async loads).
+  const optionsSig = useMemo(
+    () =>
+      Children.toArray(children)
+        .map((c) => {
+          const p = (c as { props?: { value?: unknown; children?: unknown } }).props
+          return `${String(p?.value)}:${typeof p?.children === 'string' ? p?.children : ''}`
+        })
+        .join('|'),
+    [children],
+  )
+
+  function bind() {
+    const el = ref.current
+    if (!el) return
+    const $el = $(el) as unknown as {
+      select2: (opt?: unknown) => void
+      on: (ev: string, cb: () => void) => void
+    }
+    ;(($el as unknown) as { select2: (o: unknown) => void }).select2({
+      width: '100%',
+      minimumResultsForSearch: 8,
+      dropdownCssClass: 'csr-select2-dropdown',
+    })
+    $el.on('change', () => {
+      onChangeRef.current?.({ target: { value: el.value } } as unknown as ChangeEvent<HTMLSelectElement>)
+    })
+  }
+  function unbind() {
+    const el = ref.current
+    if (!el) return
+    const $el = $(el) as unknown as { select2: (a: string) => void; off: (e: string) => void; data: (k: string) => unknown }
+    try {
+      if ($el.data('select2')) {
+        $el.off('change')
+        $el.select2('destroy')
+      }
+    } catch {
+      /* noop */
+    }
+  }
+
+  useEffect(() => {
+    bind()
+    return unbind
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Re-init when the option set changes so the list reflects the latest data.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const $el = $(el) as unknown as { data: (k: string) => unknown; trigger: (e: string) => void }
+    if ($el.data('select2')) {
+      unbind()
+      bind()
+      if (value !== undefined) {
+        el.value = String(value)
+        $el.trigger('change.select2')
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionsSig])
+
+  // Sync controlled value into Select2 without firing onChange.
+  useEffect(() => {
+    const el = ref.current
+    if (!el || value === undefined) return
+    if (el.value !== String(value)) {
+      el.value = String(value)
+      ;($(el) as unknown as { trigger: (e: string) => void }).trigger('change.select2')
+    }
+  }, [value, optionsSig])
+
   return (
-    <div className="relative inline-block w-full sm:w-auto">
-      <select
-        {...props}
-        className={`w-full appearance-none rounded-xl border border-line bg-surface/70 px-3.5 py-2.5 pr-9 text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30 sm:w-52 ${className}`}
-      >
+    <div className={`csr-select2 ${containerClassName}`}>
+      <select ref={ref} defaultValue={value as string}>
         {children}
       </select>
-      <ChevronDown
-        size={16}
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-      />
     </div>
+  )
+}
+
+// Filter-style dropdown (used in page toolbars).
+export function Select({ children, value, onChange }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <Select2Base value={value} onChange={onChange} containerClassName="w-full sm:w-52">
+      {children}
+    </Select2Base>
   )
 }
 
@@ -192,24 +297,19 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return <textarea {...props} className={inputClass} />
 }
 
-export function FormSelect({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+// Select2-backed form dropdown (same API as a native <select>).
+export function FormSelect({ children, value, onChange }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <div className="relative">
-      <select {...props} className={`${inputClass} appearance-none pr-9`}>
-        {children}
-      </select>
-      <ChevronDown
-        size={16}
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-      />
-    </div>
+    <Select2Base value={value} onChange={onChange} containerClassName="w-full">
+      {children}
+    </Select2Base>
   )
 }
 
 // ---------------- DatePicker (flatpickr) ----------------
-// Calendar-backed date field used everywhere a date is entered. Stores/emits an ISO
-// `YYYY-MM-DD` string (what the backend validators expect) while showing a friendly
-// "15 Apr 2024" format to the user via flatpickr's altInput.
+// Calendar-backed date field. Emits ISO `YYYY-MM-DD`; shows "15 Apr 2024" via altInput.
+// Month is a dropdown and the year is directly editable, so you can jump to any
+// year/month without paging through months one at a time.
 export function DatePicker({
   value,
   onChange,
@@ -223,7 +323,6 @@ export function DatePicker({
 }) {
   const ref = useRef<HTMLInputElement>(null)
   const fpRef = useRef<Instance | null>(null)
-  // Keep the latest onChange without re-initialising flatpickr on every render.
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
 
@@ -234,10 +333,10 @@ export function DatePicker({
       altInput: true,
       altFormat: 'd M Y',
       allowInput: true,
+      monthSelectorType: 'dropdown',
       defaultDate: value || undefined,
       onChange: (_dates, iso) => onChangeRef.current(iso),
     }) as Instance
-    // Mirror the `required` flag and styling onto the visible (alt) input.
     if (fp.altInput) {
       fp.altInput.className = inputClass
       fp.altInput.placeholder = placeholder
@@ -248,7 +347,6 @@ export function DatePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync external value changes (e.g. when an edit modal populates the form).
   useEffect(() => {
     const fp = fpRef.current
     if (!fp) return

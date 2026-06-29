@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2 } from '../components/icons'
+import { DataTable } from '../components/DataTable'
 import {
   companyService,
   expenditureService,
@@ -72,6 +73,14 @@ export default function Expenditures() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expenditures, companyFilter, yearFilter, search, projects, companies])
   const total = filtered.reduce((s, e) => s + e.amount, 0)
+
+  const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
+  const rows = filtered.map((e) => ({
+    ...e,
+    projectName: projectName(e.projectId),
+    companyName: companyName(e.companyId),
+    yearName: yearName(e.financialYearId),
+  }))
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['expenditures'] })
@@ -157,44 +166,31 @@ export default function Expenditures() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search expenditures…" />
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-sm">
-          <thead>
-            <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-5 py-3 font-medium">Project</th>
-              <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-5 py-3 font-medium">Year</th>
-              <th className="px-5 py-3 font-medium">Category</th>
-              <th className="px-5 py-3 font-medium">Approved By</th>
-              <th className="px-5 py-3 text-right font-medium">Amount</th>
-              {canWrite && <th className="px-5 py-3" />}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((e) => (
-              <tr key={e.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
-                <td className="px-5 py-3 text-ink/80">{formatDate(e.date)}</td>
-                <td className="px-5 py-3 text-ink/80">{projectName(e.projectId)}</td>
-                <td className="px-5 py-3 text-muted">{companyName(e.companyId)}</td>
-                <td className="px-5 py-3 text-muted">{yearName(e.financialYearId)}</td>
-                <td className="px-5 py-3 text-muted">{e.category}</td>
-                <td className="px-5 py-3 text-muted">{e.approvedBy}</td>
-                <td className="px-5 py-3 text-right font-semibold text-danger">{formatINR(e.amount)}</td>
-                {canWrite && (
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-3">
-                      <button onClick={() => openEdit(e)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
-                      <button onClick={() => setDeleteId(e.id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+      <Card className="p-2 sm:p-4">
+        <DataTable
+          data={rows}
+          columns={[
+            { data: 'date', title: 'Date', render: dateCell },
+            { data: 'projectName', title: 'Project' },
+            { data: 'companyName', title: 'Company' },
+            { data: 'yearName', title: 'Year' },
+            { data: 'category', title: 'Category' },
+            { data: 'approvedBy', title: 'Approved By' },
+            { data: 'amount', title: 'Amount', className: 'text-right' },
+            { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
+          ]}
+          slots={{
+            6: (_v, row) => <span className="font-semibold text-danger">{formatINR((row as Expenditure).amount)}</span>,
+            7: (_v, row) =>
+              canWrite ? (
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => openEdit(row as Expenditure)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
+                  <button onClick={() => setDeleteId((row as Expenditure).id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
+                </div>
+              ) : null,
+          }}
+          options={{ searching: false, order: [[0, 'desc']] }}
+        />
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Expenditure' : 'Record Expenditure'}>

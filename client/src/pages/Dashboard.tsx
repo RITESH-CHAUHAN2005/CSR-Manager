@@ -1,40 +1,100 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend as CJLegend,
+  LinearScale,
+  Tooltip as CJTooltip,
+} from 'chart.js'
+import { Bar, Doughnut } from 'react-chartjs-2'
 import { Briefcase, FileText, TrendingUp, Wallet } from '../components/icons'
 import { analyticsService } from '../services/dataService'
 import { formatINR, formatLakhAxis } from '../lib/currency'
 import { Card } from '../components/ui'
+import { DataTable } from '../components/DataTable'
 
-// Modern chart palette: blue / green / orange / purple / cyan.
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, CJTooltip, CJLegend)
+
+// Modern palette: blue / green / orange / purple / cyan.
 const PIE_COLORS = ['#2563EB', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4']
-
-// Shared chart styling helpers (theme-aware via CSS variables resolved at render).
-const axisTick = { fill: '#94a3b8', fontSize: 12 }
-const gridStroke = 'rgba(148, 163, 184, 0.22)'
-const tooltipStyle = {
-  background: 'rgb(var(--color-surface))',
-  border: '1px solid rgb(var(--color-line))',
-  borderRadius: 12,
-  boxShadow: 'var(--glass-shadow)',
-  color: 'rgb(var(--color-ink))',
-}
+const AXIS = '#94a3b8'
+const GRID = 'rgba(148, 163, 184, 0.18)'
 
 export default function Dashboard() {
   const { data } = useQuery({ queryKey: ['dashboard'], queryFn: analyticsService.dashboard })
 
   if (!data) return <p className="text-muted">Loading…</p>
+
+  const barData = {
+    labels: data.yearWise.map((y) => y.year),
+    datasets: [
+      {
+        label: 'Received',
+        data: data.yearWise.map((y) => y.received),
+        backgroundColor: '#2563EB',
+        borderRadius: 8,
+        maxBarThickness: 44,
+      },
+      {
+        label: 'Expenditure',
+        data: data.yearWise.map((y) => y.expenditure),
+        backgroundColor: '#F59E0B',
+        borderRadius: 8,
+        maxBarThickness: 44,
+      },
+    ],
+  }
+  const barOptions: any = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: { usePointStyle: true, pointStyle: 'circle', color: AXIS, boxWidth: 8, font: { size: 13 } },
+      },
+      tooltip: {
+        callbacks: { label: (c: { dataset: { label?: string }; parsed: { y: number } }) => ` ${c.dataset.label}: ${formatINR(c.parsed.y)}` },
+        padding: 10,
+        cornerRadius: 10,
+      },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: GRID }, ticks: { color: AXIS } },
+      y: {
+        grid: { color: GRID },
+        border: { display: false },
+        ticks: { color: AXIS, callback: (v: string | number) => formatLakhAxis(Number(v)) },
+      },
+    },
+  }
+
+  const pieData: any = {
+    labels: data.companyDistribution.map((c) => c.companyName),
+    datasets: [
+      {
+        data: data.companyDistribution.map((c) => c.received),
+        backgroundColor: data.companyDistribution.map((_, i) => PIE_COLORS[i % PIE_COLORS.length]),
+        borderColor: 'rgb(var(--color-surface))',
+        borderWidth: 3,
+        hoverOffset: 6,
+      },
+    ],
+  }
+  const pieOptions: any = {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '70%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: { label: (c: { label?: string; parsed: number }) => ` ${c.label}: ${formatINR(c.parsed)}` },
+        padding: 10,
+        cornerRadius: 10,
+      },
+    },
+  }
 
   return (
     <>
@@ -77,59 +137,16 @@ export default function Dashboard() {
         <Card className="p-5 sm:p-6">
           <h2 className="mb-1 font-semibold text-ink">Year-wise Fund Overview</h2>
           <p className="mb-4 text-xs text-muted">Funds received vs. expenditure per financial year</p>
-          <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={data.yearWise} barGap={8} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-              <defs>
-                <linearGradient id="grad-received" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#60A5FA" />
-                  <stop offset="100%" stopColor="#2563EB" />
-                </linearGradient>
-                <linearGradient id="grad-expenditure" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#FBBF24" />
-                  <stop offset="100%" stopColor="#F59E0B" />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridStroke} />
-              <XAxis dataKey="year" tickLine={false} axisLine={{ stroke: gridStroke }} tick={axisTick} dy={4} />
-              <YAxis tickFormatter={formatLakhAxis} tickLine={false} axisLine={false} tick={axisTick} width={48} />
-              <Tooltip
-                formatter={(v: number) => formatINR(v)}
-                contentStyle={tooltipStyle}
-                cursor={{ fill: 'rgba(148,163,184,0.10)', radius: 8 }}
-              />
-              <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
-              <Bar dataKey="received" name="Received" fill="url(#grad-received)" radius={[8, 8, 0, 0]} maxBarSize={44} />
-              <Bar dataKey="expenditure" name="Expenditure" fill="url(#grad-expenditure)" radius={[8, 8, 0, 0]} maxBarSize={44} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-[300px]">
+            <Bar data={barData} options={barOptions} />
+          </div>
         </Card>
 
         <Card className="p-5 sm:p-6">
           <h2 className="mb-1 font-semibold text-ink">Fund Distribution by Company</h2>
           <p className="mb-2 text-xs text-muted">Share of total funds received</p>
-          <div className="relative">
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie
-                  data={data.companyDistribution}
-                  dataKey="received"
-                  nameKey="companyName"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={70}
-                  outerRadius={106}
-                  paddingAngle={4}
-                  cornerRadius={6}
-                  stroke="none"
-                  isAnimationActive
-                >
-                  {data.companyDistribution.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatINR(v)} contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="relative h-[240px]">
+            <Doughnut data={pieData} options={pieOptions} />
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Total Received</span>
               <span className="text-lg font-bold text-ink">{formatINR(data.totalReceived)}</span>
@@ -157,38 +174,31 @@ export default function Dashboard() {
       {/* Company Fund Positions */}
       <Card className="mt-6 p-5 sm:p-6">
         <h2 className="mb-4 font-semibold text-ink">Company Fund Positions</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-                <th className="pb-3 font-medium">Company</th>
-                <th className="pb-3 text-right font-medium">Total Received</th>
-                <th className="pb-3 text-right font-medium">Carry Forward</th>
-                <th className="pb-3 text-right font-medium">Expenditure</th>
-                <th className="pb-3 text-right font-medium">Balance</th>
-                <th className="pb-3 text-right font-medium">Projects</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.companyPositions.map((p) => (
-                <tr
-                  key={p.companyId}
-                  className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]"
-                >
-                  <td className="py-3 font-medium text-ink">{p.companyName}</td>
-                  <td className="py-3 text-right text-ink/80">{formatINR(p.totalReceived)}</td>
-                  <td className="py-3 text-right text-muted">{formatINR(p.carryForward)}</td>
-                  <td className="py-3 text-right text-ink/80">{formatINR(p.expenditure)}</td>
-                  <td className="py-3 text-right font-semibold text-success">{formatINR(p.balance)}</td>
-                  <td className="py-3 text-right text-ink/80">{p.projects}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={data.companyPositions}
+          columns={[
+            { data: 'companyName', title: 'Company' },
+            { data: 'totalReceived', title: 'Total Received', className: 'text-right', render: money },
+            { data: 'carryForward', title: 'Carry Forward', className: 'text-right', render: money },
+            { data: 'expenditure', title: 'Expenditure', className: 'text-right', render: money },
+            { data: 'balance', title: 'Balance', className: 'text-right' },
+            { data: 'projects', title: 'Projects', className: 'text-right' },
+          ]}
+          slots={{
+            4: (_v, row) => (
+              <span className="font-semibold text-success">{formatINR((row as { balance: number }).balance)}</span>
+            ),
+          }}
+          options={{ order: [[1, 'desc']] }}
+        />
       </Card>
     </>
   )
+}
+
+// DataTables render: format currency for display, keep the raw number for sorting.
+function money(d: unknown, type: string) {
+  return type === 'display' ? formatINR(Number(d)) : (d as number)
 }
 
 function StatCard({

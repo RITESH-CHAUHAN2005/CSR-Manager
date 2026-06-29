@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2 } from '../components/icons'
+import { DataTable } from '../components/DataTable'
 import {
   companyService,
   financialYearService,
@@ -66,6 +67,14 @@ export default function FundReceipts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipts, companyFilter, yearFilter, search, companies])
   const total = filtered.reduce((s, r) => s + r.amount, 0)
+
+  const money = (d: unknown, type: string) => (type === 'display' ? formatINR(Number(d)) : Number(d))
+  const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
+  const rows = filtered.map((r) => ({
+    ...r,
+    companyName: companyName(r.companyId),
+    yearName: yearName(r.financialYearId),
+  }))
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['fund-receipts'] })
@@ -135,44 +144,31 @@ export default function FundReceipts() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search receipts…" />
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-sm">
-          <thead>
-            <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
-              <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-5 py-3 font-medium">Year</th>
-              <th className="px-5 py-3 font-medium">Reference</th>
-              <th className="px-5 py-3 font-medium">Mode</th>
-              <th className="px-5 py-3 text-right font-medium">Carry Forward</th>
-              <th className="px-5 py-3 text-right font-medium">Amount</th>
-              {canWrite && <th className="px-5 py-3" />}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
-                <td className="px-5 py-3 text-ink/80">{formatDate(r.date)}</td>
-                <td className="px-5 py-3 text-ink/80">{companyName(r.companyId)}</td>
-                <td className="px-5 py-3 text-muted">{yearName(r.financialYearId)}</td>
-                <td className="px-5 py-3 text-muted">{r.reference}</td>
-                <td className="px-5 py-3 text-muted">{r.mode}</td>
-                <td className="px-5 py-3 text-right text-muted">{formatINR(r.carryForward)}</td>
-                <td className="px-5 py-3 text-right font-semibold text-success">{formatINR(r.amount)}</td>
-                {canWrite && (
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-3">
-                      <button onClick={() => openEdit(r)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
-                      <button onClick={() => setDeleteId(r.id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+      <Card className="p-2 sm:p-4">
+        <DataTable
+          data={rows}
+          columns={[
+            { data: 'date', title: 'Date', render: dateCell },
+            { data: 'companyName', title: 'Company' },
+            { data: 'yearName', title: 'Year' },
+            { data: 'reference', title: 'Reference' },
+            { data: 'mode', title: 'Mode' },
+            { data: 'carryForward', title: 'Carry Forward', className: 'text-right', render: money },
+            { data: 'amount', title: 'Amount', className: 'text-right' },
+            { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
+          ]}
+          slots={{
+            6: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
+            7: (_v, row) =>
+              canWrite ? (
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => openEdit(row as FundReceipt)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
+                  <button onClick={() => setDeleteId((row as FundReceipt).id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
+                </div>
+              ) : null,
+          }}
+          options={{ searching: false, order: [[0, 'desc']] }}
+        />
       </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Receipt' : 'Record Receipt'}>

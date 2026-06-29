@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, Share, Trash2, UsersThree } from '../components/icons'
 import { logService, userAdminService } from '../services/dataService'
+import { DataTable, type DTColumn } from '../components/DataTable'
 import type { AuditLogEntry, ManagedUser, NewUserInput } from '../types'
 import {
   Card,
@@ -78,6 +79,15 @@ export default function AdminPanel() {
   const adminCount = users.filter((u) => u.role === 'admin').length
   const editorCount = users.filter((u) => u.role === 'editor').length
   const viewerCount = users.filter((u) => u.role === 'viewer').length
+
+  const userRows = users.map((u) => ({ ...u, companyLabel: companyName(u.companyId) }))
+  const userColumns: DTColumn[] = [
+    { data: 'name', title: 'Name' },
+    { data: 'email', title: 'Email' },
+    { data: 'role', title: 'Role' },
+    { data: 'companyLabel', title: 'Company' },
+    { data: null, title: '', orderable: false, className: 'text-right' },
+  ]
 
   const filteredLogs = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -174,56 +184,35 @@ export default function AdminPanel() {
           <h2 className="font-semibold text-ink">All Users</h2>
           {deleteError && <span className="text-sm text-danger">{deleteError}</span>}
         </div>
-        <div className="overflow-x-auto">
-        <table className="mt-3 w-full min-w-[600px] text-sm">
-          <thead>
-            <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
-              <th className="px-5 py-3 font-medium">Name</th>
-              <th className="px-5 py-3 font-medium">Email</th>
-              <th className="px-5 py-3 font-medium">Role</th>
-              <th className="px-5 py-3 font-medium">Company</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]">
-                <td className="px-5 py-3 font-medium text-ink">{u.name}</td>
-                <td className="px-5 py-3 text-ink/80">{u.email}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
-                      roleBadge[u.role] ?? 'bg-ink/10 text-muted'
-                    }`}
+        <div className="p-2 sm:p-4">
+          <DataTable
+            data={userRows}
+            columns={userColumns}
+            slots={{
+              2: (_cell, row) => (
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
+                    roleBadge[row.role] ?? 'bg-ink/10 text-muted'
+                  }`}
+                >
+                  {row.role}
+                </span>
+              ),
+              4: (_cell, row) =>
+                currentUser?.id === row.id ? (
+                  <span className="text-xs text-muted">You</span>
+                ) : (
+                  <button
+                    onClick={() => setDeleteId(row.id)}
+                    className="text-muted hover:text-danger"
+                    title="Delete user"
                   >
-                    {u.role}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-muted">{companyName(u.companyId)}</td>
-                <td className="px-5 py-3 text-right">
-                  {currentUser?.id === u.id ? (
-                    <span className="text-xs text-muted">You</span>
-                  ) : (
-                    <button
-                      onClick={() => setDeleteId(u.id)}
-                      className="text-muted hover:text-danger"
-                      title="Delete user"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={5} className="py-10 text-center text-sm text-muted">
-                  No users yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                    <Trash2 size={16} />
+                  </button>
+                ),
+            }}
+            options={{ order: [] }}
+          />
         </div>
       </Card>
 

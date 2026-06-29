@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend as CJLegend,
+  LinearScale,
+  Tooltip as CJTooltip,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
 import { FileDown, FileText } from "../components/icons";
 import {
   analyticsService,
@@ -21,12 +20,17 @@ import {
 } from "../services/dataService";
 import { USE_API } from "../services/api";
 import { formatINR, formatLakhAxis } from "../lib/currency";
-import { Card, PageHeader, Select } from "../components/ui";
+import { Card, PageHeader, Select, StatusBadge } from "../components/ui";
+import { DataTable } from "../components/DataTable";
 import { downloadCsv, printReport, saveBlob } from "../lib/exporters";
 import { useAuth } from "../context/AuthContext";
 
+ChartJS.register(CategoryScale, LinearScale, BarElement, CJTooltip, CJLegend);
+
 type Tab = "year" | "company" | "project";
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+const money = (d: unknown, type: string) =>
+  type === "display" ? formatINR(Number(d)) : Number(d);
 
 export default function Reports() {
   const { canWrite } = useAuth();
@@ -330,217 +334,100 @@ export default function Reports() {
               <h2 className="mb-4 font-semibold text-ink">
                 Fund Flow by Financial Year
               </h2>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={yearRows} barGap={6} barCategoryGap="24%" margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="rep-received" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#60A5FA" />
-                      <stop offset="100%" stopColor="#2563EB" />
-                    </linearGradient>
-                    <linearGradient id="rep-carry" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#93C5FD" />
-                      <stop offset="100%" stopColor="#60A5FA" />
-                    </linearGradient>
-                    <linearGradient id="rep-exp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#FBBF24" />
-                      <stop offset="100%" stopColor="#F59E0B" />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="4 4"
-                    vertical={false}
-                    stroke="rgba(148,163,184,0.22)"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    tickLine={false}
-                    axisLine={{ stroke: "rgba(148,163,184,0.22)" }}
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                  />
-                  <YAxis
-                    tickFormatter={formatLakhAxis}
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                  />
-                  <Tooltip
-                    formatter={(v: number) => formatINR(v)}
-                    contentStyle={{
-                      background: "rgb(var(--color-surface))",
-                      border: "1px solid rgb(var(--color-line))",
-                      borderRadius: 12,
-                      color: "rgb(var(--color-ink))",
-                    }}
-                  />
-                  <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
-                  <Bar
-                    dataKey="fundsReceived"
-                    name="Received"
-                    fill="url(#rep-received)"
-                    radius={[8, 8, 0, 0]}
-                    maxBarSize={38}
-                  />
-                  <Bar
-                    dataKey="carryForwardIn"
-                    name="Carry In"
-                    fill="url(#rep-carry)"
-                    radius={[8, 8, 0, 0]}
-                    maxBarSize={38}
-                  />
-                  <Bar
-                    dataKey="expenditure"
-                    name="Expenditure"
-                    fill="url(#rep-exp)"
-                    radius={[8, 8, 0, 0]}
-                    maxBarSize={38}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="h-[320px]">
+                <Bar
+                  data={{
+                    labels: yearRows.map((r) => r.name),
+                    datasets: [
+                      { label: "Received", data: yearRows.map((r) => r.fundsReceived), backgroundColor: "#2563EB", borderRadius: 8, maxBarThickness: 38 },
+                      { label: "Carry In", data: yearRows.map((r) => r.carryForwardIn), backgroundColor: "#60A5FA", borderRadius: 8, maxBarThickness: 38 },
+                      { label: "Expenditure", data: yearRows.map((r) => r.expenditure), backgroundColor: "#F59E0B", borderRadius: 8, maxBarThickness: 38 },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", color: "#94a3b8", boxWidth: 8, font: { size: 13 } } },
+                      tooltip: { callbacks: { label: (c: any) => ` ${c.dataset.label}: ${formatINR(c.parsed.y)}` }, padding: 10, cornerRadius: 10 },
+                    },
+                    scales: {
+                      x: { grid: { display: false }, border: { color: "rgba(148,163,184,0.22)" }, ticks: { color: "#94a3b8" } },
+                      y: { grid: { color: "rgba(148,163,184,0.18)" }, border: { display: false }, ticks: { color: "#94a3b8", callback: (v: any) => formatLakhAxis(Number(v)) } },
+                    },
+                  } as any}
+                />
+              </div>
             </Card>
 
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead>
-                  <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
-                    <th className="px-5 py-3 font-medium">Financial Year</th>
-                    <Th>Funds Received</Th>
-                    <Th>Carry Forward In</Th>
-                    <Th>Total Available</Th>
-                    <Th>Expenditure</Th>
-                    <Th>Balance</Th>
-                    <Th>Carry Forward Out</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {yearRows.map((r) => (
-                    <tr key={r.name} className="border-b border-line/60 transition-colors hover:bg-ink/[0.03]">
-                      <td className="px-5 py-3 font-medium text-ink">
-                        {r.name}
-                      </td>
-                      <Td>{formatINR(r.fundsReceived)}</Td>
-                      <Td>{formatINR(r.carryForwardIn)}</Td>
-                      <Td>{formatINR(r.totalAvailable)}</Td>
-                      <Td className="text-danger">
-                        {formatINR(r.expenditure)}
-                      </Td>
-                      <Td className="text-success">{formatINR(r.balance)}</Td>
-                      <Td>{formatINR(r.carryForwardOut)}</Td>
-                    </tr>
-                  ))}
-                  <tr className="bg-ink/[0.03] font-semibold">
-                    <td className="px-5 py-3 text-ink">Total</td>
-                    <Td>{formatINR(yearTotals.fundsReceived)}</Td>
-                    <Td>{formatINR(yearTotals.carryForwardIn)}</Td>
-                    <Td>{formatINR(yearTotals.totalAvailable)}</Td>
-                    <Td className="text-danger">
-                      {formatINR(yearTotals.expenditure)}
-                    </Td>
-                    <Td className="text-success">
-                      {formatINR(yearTotals.balance)}
-                    </Td>
-                    <Td>{formatINR(yearTotals.carryForwardOut)}</Td>
-                  </tr>
-                </tbody>
-              </table>
+            <Card className="p-2 sm:p-4">
+              <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
+                Total Received: <span className="font-semibold text-ink">{formatINR(yearTotals.fundsReceived)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(yearTotals.expenditure)}</span> · Balance: <span className="font-semibold text-success">{formatINR(yearTotals.balance)}</span>
               </div>
+              <DataTable
+                data={yearRows}
+                columns={[
+                  { data: "name", title: "Financial Year" },
+                  { data: "fundsReceived", title: "Funds Received", className: "text-right", render: money },
+                  { data: "carryForwardIn", title: "Carry Forward In", className: "text-right", render: money },
+                  { data: "totalAvailable", title: "Total Available", className: "text-right", render: money },
+                  { data: "expenditure", title: "Expenditure", className: "text-right", render: money },
+                  { data: "balance", title: "Balance", className: "text-right", render: money },
+                  { data: "carryForwardOut", title: "Carry Forward Out", className: "text-right", render: money },
+                ]}
+                slots={{
+                  4: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
+                  5: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
+                }}
+                options={{ searching: false, order: [] }}
+              />
             </Card>
           </>
         )}
 
         {tab === "company" && (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
-                  <th className="px-5 py-3 font-medium">Company</th>
-                  <Th>Total Received</Th>
-                  <Th>Carry Forward</Th>
-                  <Th>Expenditure</Th>
-                  <Th>Balance</Th>
-                  <Th>Projects</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {companyRows.map((r) => (
-                  <tr
-                    key={r.name}
-                    className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]"
-                  >
-                    <td className="px-5 py-3 font-medium text-ink">
-                      {r.name}
-                    </td>
-                    <Td>{formatINR(r.received)}</Td>
-                    <Td>{formatINR(r.carry)}</Td>
-                    <Td className="text-danger">{formatINR(r.expenditure)}</Td>
-                    <Td className="text-success">{formatINR(r.balance)}</Td>
-                    <Td>{r.projects}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+          <Card className="p-2 sm:p-4">
+            <DataTable
+              data={companyRows}
+              columns={[
+                { data: "name", title: "Company" },
+                { data: "received", title: "Total Received", className: "text-right", render: money },
+                { data: "carry", title: "Carry Forward", className: "text-right", render: money },
+                { data: "expenditure", title: "Expenditure", className: "text-right", render: money },
+                { data: "balance", title: "Balance", className: "text-right", render: money },
+                { data: "projects", title: "Projects", className: "text-right" },
+              ]}
+              slots={{
+                3: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
+                4: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
+              }}
+              options={{ searching: false, order: [] }}
+            />
           </Card>
         )}
 
         {tab === "project" && (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead>
-                <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
-                  <th className="px-5 py-3 font-medium">Project</th>
-                  <th className="px-5 py-3 font-medium">Company</th>
-                  <th className="px-5 py-3 font-medium">Year</th>
-                  <Th>Budget</Th>
-                  <Th>Spent</Th>
-                  <Th>Utilization</Th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projectRows.map((r) => (
-                  <tr
-                    key={r.name}
-                    className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]"
-                  >
-                    <td className="px-5 py-3 font-medium text-ink">
-                      {r.name}
-                    </td>
-                    <td className="px-5 py-3 text-muted">{r.company}</td>
-                    <td className="px-5 py-3 text-muted">{r.year}</td>
-                    <Td>{formatINR(r.budget)}</Td>
-                    <Td className="text-danger">{formatINR(r.spent)}</Td>
-                    <Td>{r.utilization}%</Td>
-                    <td className="px-5 py-3 capitalize text-ink/80">
-                      {r.status}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+          <Card className="p-2 sm:p-4">
+            <DataTable
+              data={projectRows}
+              columns={[
+                { data: "name", title: "Project" },
+                { data: "company", title: "Company" },
+                { data: "year", title: "Year" },
+                { data: "budget", title: "Budget", className: "text-right", render: money },
+                { data: "spent", title: "Spent", className: "text-right", render: money },
+                { data: "utilization", title: "Utilization", className: "text-right", render: (d, type) => (type === "display" ? d + "%" : d) },
+                { data: "status", title: "Status" },
+              ]}
+              slots={{
+                4: (_v, row) => <span className="text-danger">{formatINR(row.spent)}</span>,
+                6: (_v, row) => <StatusBadge status={row.status} />,
+              }}
+              options={{ searching: false, order: [] }}
+            />
           </Card>
         )}
       </div>
     </>
-  );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-5 py-3 text-right font-medium">{children}</th>;
-}
-function Td({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <td className={`px-5 py-3 text-right text-ink/80 ${className}`}>
-      {children}
-    </td>
   );
 }
