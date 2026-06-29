@@ -17,9 +17,7 @@ import { analyticsService } from '../services/dataService'
 import { formatINR, formatLakhAxis } from '../lib/currency'
 import { Card } from '../components/ui'
 
-// Modern chart palette: Received = blue, Expenditure = orange, Balance = green.
-const RECEIVED = '#2563EB'
-const EXPENDITURE = '#F59E0B'
+// Modern chart palette: blue / green / orange / purple / cyan.
 const PIE_COLORS = ['#2563EB', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4']
 
 // Shared chart styling helpers (theme-aware via CSS variables resolved at render).
@@ -77,50 +75,82 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-5 sm:p-6">
-          <h2 className="mb-4 font-semibold text-ink">Year-wise Fund Overview</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data.yearWise} barGap={6}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
-              <XAxis dataKey="year" tickLine={false} axisLine={{ stroke: gridStroke }} tick={axisTick} />
-              <YAxis tickFormatter={formatLakhAxis} tickLine={false} axisLine={false} tick={axisTick} />
+          <h2 className="mb-1 font-semibold text-ink">Year-wise Fund Overview</h2>
+          <p className="mb-4 text-xs text-muted">Funds received vs. expenditure per financial year</p>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={data.yearWise} barGap={8} barCategoryGap="28%" margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="grad-received" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#60A5FA" />
+                  <stop offset="100%" stopColor="#2563EB" />
+                </linearGradient>
+                <linearGradient id="grad-expenditure" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FBBF24" />
+                  <stop offset="100%" stopColor="#F59E0B" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke={gridStroke} />
+              <XAxis dataKey="year" tickLine={false} axisLine={{ stroke: gridStroke }} tick={axisTick} dy={4} />
+              <YAxis tickFormatter={formatLakhAxis} tickLine={false} axisLine={false} tick={axisTick} width={48} />
               <Tooltip
                 formatter={(v: number) => formatINR(v)}
                 contentStyle={tooltipStyle}
-                cursor={{ fill: 'rgba(148,163,184,0.12)' }}
+                cursor={{ fill: 'rgba(148,163,184,0.10)', radius: 8 }}
               />
-              <Legend wrapperStyle={{ fontSize: 13, paddingTop: 8 }} />
-              <Bar dataKey="received" name="Received" fill={RECEIVED} radius={[6, 6, 0, 0]} maxBarSize={42} />
-              <Bar dataKey="expenditure" name="Expenditure" fill={EXPENDITURE} radius={[6, 6, 0, 0]} maxBarSize={42} />
+              <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
+              <Bar dataKey="received" name="Received" fill="url(#grad-received)" radius={[8, 8, 0, 0]} maxBarSize={44} />
+              <Bar dataKey="expenditure" name="Expenditure" fill="url(#grad-expenditure)" radius={[8, 8, 0, 0]} maxBarSize={44} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         <Card className="p-5 sm:p-6">
-          <h2 className="mb-4 font-semibold text-ink">Fund Distribution by Company</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={data.companyDistribution}
-                dataKey="received"
-                nameKey="companyName"
-                cx="50%"
-                cy="50%"
-                innerRadius={58}
-                outerRadius={100}
-                paddingAngle={3}
-                isAnimationActive={false}
-                label={({ companyName, percent }) =>
-                  `${String(companyName).split(' ')[0]} ${Math.round(percent as number)}%`
-                }
-                labelLine={false}
-              >
-                {data.companyDistribution.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="rgb(var(--color-surface))" strokeWidth={3} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v: number) => formatINR(v)} contentStyle={tooltipStyle} />
-            </PieChart>
-          </ResponsiveContainer>
+          <h2 className="mb-1 font-semibold text-ink">Fund Distribution by Company</h2>
+          <p className="mb-2 text-xs text-muted">Share of total funds received</p>
+          <div className="relative">
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie
+                  data={data.companyDistribution}
+                  dataKey="received"
+                  nameKey="companyName"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={70}
+                  outerRadius={106}
+                  paddingAngle={4}
+                  cornerRadius={6}
+                  stroke="none"
+                  isAnimationActive
+                >
+                  {data.companyDistribution.map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v: number) => formatINR(v)} contentStyle={tooltipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted">Total Received</span>
+              <span className="text-lg font-bold text-ink">{formatINR(data.totalReceived)}</span>
+            </div>
+          </div>
+          <div className="mt-4 space-y-2">
+            {data.companyDistribution.map((c, i) => (
+              <div key={c.companyName} className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex min-w-0 items-center gap-2 text-ink/80">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                  />
+                  <span className="truncate">{c.companyName}</span>
+                </span>
+                <span className="shrink-0 text-muted">
+                  {c.percent}% · {formatINR(c.received)}
+                </span>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
 

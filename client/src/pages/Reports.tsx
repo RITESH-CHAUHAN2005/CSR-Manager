@@ -331,9 +331,23 @@ export default function Reports() {
                 Fund Flow by Financial Year
               </h2>
               <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={yearRows} barGap={4}>
+                <BarChart data={yearRows} barGap={6} barCategoryGap="24%" margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="rep-received" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#60A5FA" />
+                      <stop offset="100%" stopColor="#2563EB" />
+                    </linearGradient>
+                    <linearGradient id="rep-carry" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#93C5FD" />
+                      <stop offset="100%" stopColor="#60A5FA" />
+                    </linearGradient>
+                    <linearGradient id="rep-exp" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#FBBF24" />
+                      <stop offset="100%" stopColor="#F59E0B" />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid
-                    strokeDasharray="3 3"
+                    strokeDasharray="4 4"
                     vertical={false}
                     stroke="rgba(148,163,184,0.22)"
                   />
@@ -358,24 +372,27 @@ export default function Reports() {
                       color: "rgb(var(--color-ink))",
                     }}
                   />
-                  <Legend />
+                  <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
                   <Bar
                     dataKey="fundsReceived"
                     name="Received"
-                    fill="#2563EB"
-                    radius={[6, 6, 0, 0]}
+                    fill="url(#rep-received)"
+                    radius={[8, 8, 0, 0]}
+                    maxBarSize={38}
                   />
                   <Bar
                     dataKey="carryForwardIn"
                     name="Carry In"
-                    fill="#60A5FA"
-                    radius={[6, 6, 0, 0]}
+                    fill="url(#rep-carry)"
+                    radius={[8, 8, 0, 0]}
+                    maxBarSize={38}
                   />
                   <Bar
                     dataKey="expenditure"
                     name="Expenditure"
-                    fill="#F59E0B"
-                    radius={[6, 6, 0, 0]}
+                    fill="url(#rep-exp)"
+                    radius={[8, 8, 0, 0]}
+                    maxBarSize={38}
                   />
                 </BarChart>
               </ResponsiveContainer>

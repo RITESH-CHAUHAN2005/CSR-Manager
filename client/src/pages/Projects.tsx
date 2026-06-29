@@ -88,9 +88,20 @@ export default function Projects() {
   })
   const deleteM = useMutation({ mutationFn: projectService.remove, onSuccess: invalidate })
 
+  // Only active financial years can be chosen when adding. When editing, keep the
+  // record's own (possibly inactive) year as an option so existing data stays intact.
+  const activeYears = useMemo(() => years.filter((y) => y.isActive), [years])
+  const yearOptions = useMemo(() => {
+    if (form.financialYearId && !activeYears.some((y) => y.id === form.financialYearId)) {
+      const cur = years.find((y) => y.id === form.financialYearId)
+      if (cur) return [cur, ...activeYears]
+    }
+    return activeYears
+  }, [activeYears, years, form.financialYearId])
+
   function openAdd() {
     setEditing(null)
-    setForm({ ...emptyForm, companyId: companies[0]?.id ?? '', financialYearId: years[0]?.id ?? '' })
+    setForm({ ...emptyForm, companyId: companies[0]?.id ?? '', financialYearId: activeYears[0]?.id ?? '' })
     setFormError('')
     setOpen(true)
   }
@@ -190,7 +201,7 @@ export default function Projects() {
             </Field>
             <Field label="Financial Year">
               <FormSelect required value={form.financialYearId} onChange={(e) => setForm({ ...form, financialYearId: e.target.value })}>
-                {years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+                {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
               </FormSelect>
             </Field>
             <Field label="Category">

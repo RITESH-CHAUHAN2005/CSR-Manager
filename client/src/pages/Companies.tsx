@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Mail, Phone, User } from '../components/icons'
+import { ChevronRight, Mail, Pencil, Phone, Trash2, User } from '../components/icons'
 import { companyService, analyticsService } from '../services/dataService'
 import type { Company } from '../types'
 import { formatINR } from '../lib/currency'
@@ -160,15 +160,18 @@ export default function Companies() {
               </button>
 
               {canWrite && (
-                <div className="mt-2 flex justify-end gap-3 text-xs">
-                  <button onClick={() => openEdit(c)} className="text-muted hover:text-primary">
-                    Edit
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => openEdit(c)}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5"
+                  >
+                    <Pencil size={15} /> Edit
                   </button>
                   <button
                     onClick={() => setDeleteId(c.id)}
-                    className="text-muted hover:text-danger"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-danger/30 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
                   >
-                    Delete
+                    <Trash2 size={15} /> Delete
                   </button>
                 </div>
               )}

@@ -85,6 +85,17 @@ export default function Expenditures() {
   })
   const deleteM = useMutation({ mutationFn: expenditureService.remove, onSuccess: invalidate })
 
+  // Only active financial years can be chosen when adding. When editing (or when a
+  // picked project belongs to a closed year), keep that year as an option too.
+  const activeYears = useMemo(() => years.filter((y) => y.isActive), [years])
+  const yearOptions = useMemo(() => {
+    if (form.financialYearId && !activeYears.some((y) => y.id === form.financialYearId)) {
+      const cur = years.find((y) => y.id === form.financialYearId)
+      if (cur) return [cur, ...activeYears]
+    }
+    return activeYears
+  }, [activeYears, years, form.financialYearId])
+
   // Selecting a project auto-fills its company and financial year (matches the data model).
   function pickProject(projectId: string) {
     const proj = projects.find((p) => p.id === projectId)
@@ -199,7 +210,7 @@ export default function Expenditures() {
             </Field>
             <Field label="Financial Year">
               <FormSelect required value={form.financialYearId} onChange={(e) => setForm({ ...form, financialYearId: e.target.value })}>
-                {years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+                {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
               </FormSelect>
             </Field>
             <Field label="Category">
