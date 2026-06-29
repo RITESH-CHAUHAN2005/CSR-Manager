@@ -110,7 +110,7 @@ export default function Dashboard() {
                 paddingAngle={3}
                 isAnimationActive={false}
                 label={({ companyName, percent }) =>
-                  `${String(companyName).split(' ')[0]} ${Math.round((percent as number) * 100)}%`
+                  `${String(companyName).split(' ')[0]} ${Math.round(percent as number)}%`
                 }
                 labelLine={false}
               >
