@@ -28,7 +28,7 @@ const emptyUser: NewUserInput = { name: '', email: '', password: '', role: 'edit
 const roleBadge: Record<string, string> = {
   admin: 'bg-primary/10 text-primary',
   editor: 'bg-accent/10 text-accent-dark',
-  viewer: 'bg-slate-100 text-slate-600',
+  viewer: 'bg-ink/10 text-muted',
 }
 
 export default function AdminPanel() {
@@ -120,7 +120,7 @@ export default function AdminPanel() {
 
       {/* Create user */}
       <Card className="mb-6 p-5">
-        <h2 className="mb-4 font-semibold text-slate-800">Add User Account</h2>
+        <h2 className="mb-4 font-semibold text-ink">Add User Account</h2>
         <form onSubmit={onCreate} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Full Name">
             <TextInput
@@ -171,13 +171,13 @@ export default function AdminPanel() {
       {/* All users */}
       <Card className="mb-6 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
-          <h2 className="font-semibold text-slate-800">All Users</h2>
+          <h2 className="font-semibold text-ink">All Users</h2>
           {deleteError && <span className="text-sm text-danger">{deleteError}</span>}
         </div>
         <div className="overflow-x-auto">
         <table className="mt-3 w-full min-w-[600px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-5 py-3 font-medium">Email</th>
               <th className="px-5 py-3 font-medium">Role</th>
@@ -187,26 +187,26 @@ export default function AdminPanel() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-slate-100 last:border-0">
-                <td className="px-5 py-3 font-medium text-slate-800">{u.name}</td>
-                <td className="px-5 py-3 text-slate-600">{u.email}</td>
+              <tr key={u.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]">
+                <td className="px-5 py-3 font-medium text-ink">{u.name}</td>
+                <td className="px-5 py-3 text-ink/80">{u.email}</td>
                 <td className="px-5 py-3">
                   <span
                     className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
-                      roleBadge[u.role] ?? 'bg-slate-100 text-slate-600'
+                      roleBadge[u.role] ?? 'bg-ink/10 text-muted'
                     }`}
                   >
                     {u.role}
                   </span>
                 </td>
-                <td className="px-5 py-3 text-slate-500">{companyName(u.companyId)}</td>
+                <td className="px-5 py-3 text-muted">{companyName(u.companyId)}</td>
                 <td className="px-5 py-3 text-right">
                   {currentUser?.id === u.id ? (
-                    <span className="text-xs text-slate-400">You</span>
+                    <span className="text-xs text-muted">You</span>
                   ) : (
                     <button
                       onClick={() => setDeleteId(u.id)}
-                      className="text-slate-400 hover:text-danger"
+                      className="text-muted hover:text-danger"
                       title="Delete user"
                     >
                       <Trash2 size={16} />
@@ -217,7 +217,7 @@ export default function AdminPanel() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
+                <td colSpan={5} className="py-10 text-center text-sm text-muted">
                   No users yet.
                 </td>
               </tr>
@@ -230,13 +230,13 @@ export default function AdminPanel() {
       {/* Activity logs */}
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-800">Activity Logs</h2>
+          <h2 className="font-semibold text-ink">Activity Logs</h2>
           <div className="flex items-center gap-3">
             {shareNote && <span className="text-sm font-medium text-success">{shareNote}</span>}
             {logs.length > 0 && (
               <button
                 onClick={() => setClearOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-danger hover:bg-red-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-surface/70 px-3 py-1.5 text-sm font-medium text-danger"
               >
                 <Trash2 size={15} /> Clear Logs
               </button>
@@ -246,12 +246,12 @@ export default function AdminPanel() {
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <div className="relative w-full sm:w-auto">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search activity…"
-              className="w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-64"
+              className="w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-10 pr-3 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-64"
             />
           </div>
           <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}>
@@ -274,7 +274,7 @@ export default function AdminPanel() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+              <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
                 <th className="px-3 py-3 font-medium">When</th>
                 <th className="px-3 py-3 font-medium">User</th>
                 <th className="px-3 py-3 font-medium">Role</th>
@@ -284,13 +284,13 @@ export default function AdminPanel() {
             </thead>
             <tbody>
               {filteredLogs.map((l) => (
-                <tr key={l.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                  <td className="px-3 py-3 whitespace-nowrap text-slate-500">
+                <tr key={l.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]">
+                  <td className="px-3 py-3 whitespace-nowrap text-muted">
                     {formatTimestamp(l.createdAt)}
                   </td>
-                  <td className="px-3 py-3 text-slate-700">{l.userEmail}</td>
-                  <td className="px-3 py-3 capitalize text-slate-500">{l.userRole ?? '—'}</td>
-                  <td className="px-3 py-3 align-top text-slate-700">
+                  <td className="px-3 py-3 text-ink/80">{l.userEmail}</td>
+                  <td className="px-3 py-3 capitalize text-muted">{l.userRole ?? '—'}</td>
+                  <td className="px-3 py-3 align-top text-ink/80">
                     <span className="font-medium capitalize">{describeLog(l)}</span>
                     <LogDetails log={l} />
                   </td>
@@ -298,7 +298,7 @@ export default function AdminPanel() {
                     <button
                       onClick={() => onShare(l)}
                       title="Share this log"
-                      className="text-slate-400 hover:text-primary"
+                      className="text-muted hover:text-primary"
                     >
                       <Share size={16} />
                     </button>
@@ -307,7 +307,7 @@ export default function AdminPanel() {
               ))}
               {filteredLogs.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="py-10 text-center text-sm text-muted">
                     No activity yet.
                   </td>
                 </tr>
@@ -346,20 +346,20 @@ function LogDetails({ log }: { log: AuditLogEntry }) {
   if (details.length === 0) return null
   const isUpdate = log.action === 'update'
   return (
-    <ul className="mt-1.5 space-y-1 border-l-2 border-slate-100 pl-3 text-xs text-slate-500">
+    <ul className="mt-1.5 space-y-1 border-l-2 border-line pl-3 text-xs text-muted">
       {details.map((d, i) => (
         <li key={i} className="flex flex-wrap items-center gap-x-1.5">
-          <span className="font-medium text-slate-600">{d.label}:</span>
+          <span className="font-medium text-ink/80">{d.label}:</span>
           {isUpdate ? (
             <>
-              <span className="rounded bg-red-50 px-1.5 py-0.5 text-red-600 line-through decoration-red-300">
+              <span className="rounded bg-danger/10 px-1.5 py-0.5 text-danger line-through decoration-danger/40">
                 {d.from}
               </span>
-              <span className="text-slate-400">→</span>
-              <span className="rounded bg-green-50 px-1.5 py-0.5 text-green-700">{d.to}</span>
+              <span className="text-muted">→</span>
+              <span className="rounded bg-success/10 px-1.5 py-0.5 text-success">{d.to}</span>
             </>
           ) : (
-            <span className="text-slate-700">{d.value}</span>
+            <span className="text-ink/80">{d.value}</span>
           )}
         </li>
       ))}
@@ -369,12 +369,12 @@ function LogDetails({ log }: { log: AuditLogEntry }) {
 
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <Card className="p-5">
+    <Card className="lift p-5">
       <div className="flex items-start justify-between">
-        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-sm text-muted">{label}</p>
         {icon && <span className="text-primary">{icon}</span>}
       </div>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </Card>
   )
 }

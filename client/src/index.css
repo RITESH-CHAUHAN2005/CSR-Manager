@@ -11,42 +11,103 @@ body,
 
 body {
   margin: 0;
-  background-color: rgb(var(--color-canvas));
-  color: #0f172a;
+  background-color: rgb(var(--color-bg));
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
+  color: rgb(var(--color-ink));
   font-family: Inter, system-ui, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Flatpickr calendar — themed to the brand teal palette */
+/* Smooth theme transition for color/background changes (not transforms). */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: ease;
+}
+/* Don't fight component-level transitions / animations. */
+.no-theme-transition,
+.no-theme-transition * {
+  transition: none !important;
+}
+
+@layer components {
+  /* Tasteful glassmorphism for cards and panels. */
+  .glass-card {
+    background-color: rgb(var(--color-surface) / var(--glass-alpha));
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+  /* Subtle hover lift used on interactive cards. */
+  .lift {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+    will-change: transform;
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--glass-shadow), 0 22px 48px -20px rgba(15, 23, 42, 0.35);
+  }
+}
+
+/* Thin, subtle, theme-aware scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-muted) / 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-muted) / 0.6);
+}
+
+/* Flatpickr calendar — themed to the brand palette (light + dark) */
+.flatpickr-calendar {
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-line));
+  box-shadow: var(--glass-shadow);
+  color: rgb(var(--color-ink));
+}
+.flatpickr-calendar.arrowTop::before,
+.flatpickr-calendar.arrowTop::after,
+.flatpickr-calendar.arrowBottom::before,
+.flatpickr-calendar.arrowBottom::after {
+  border-bottom-color: rgb(var(--color-surface));
+  border-top-color: rgb(var(--color-surface));
+}
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-weekday,
+.flatpickr-day {
+  color: rgb(var(--color-ink));
+  fill: rgb(var(--color-ink));
+}
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+  color: rgb(var(--color-muted) / 0.6);
+}
+.flatpickr-months .flatpickr-prev-month svg,
+.flatpickr-months .flatpickr-next-month svg {
+  fill: rgb(var(--color-ink));
+}
 .flatpickr-day.selected,
 .flatpickr-day.selected:hover,
 .flatpickr-day.startRange,
 .flatpickr-day.endRange {
   background: rgb(var(--color-primary));
   border-color: rgb(var(--color-primary));
+  color: #fff;
 }
 .flatpickr-day.today {
   border-color: rgb(var(--color-primary-light));
 }
 .flatpickr-day:hover {
-  background: rgb(var(--color-canvas));
-}
-.flatpickr-months .flatpickr-month,
-.flatpickr-current-month .flatpickr-monthDropdown-months,
-.flatpickr-weekday {
-  color: rgb(var(--color-primary-dark));
-  fill: rgb(var(--color-primary-dark));
-}
-
-/* Thin, subtle scrollbars to match the clean dashboard look */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgb(var(--color-primary) / 0.12);
+  border-color: transparent;
 }

@@ -56,34 +56,34 @@ export default function FinancialYears() {
 
       <div className="space-y-4">
         {years.map((fy) => (
-          <Card key={fy.id} className="flex items-center justify-between px-5 py-4">
+          <Card key={fy.id} className="lift flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-4">
-              <span className="text-slate-400">
+              <span className="text-muted">
                 <CalendarDays size={20} />
               </span>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-slate-900">{fy.name}</h3>
+                  <h3 className="font-semibold text-ink">{fy.name}</h3>
                   {fy.isActive && (
-                    <span className="rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    <span className="rounded-md bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
                       Active
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted">
                   {fy.startDate} to {fy.endDate}
                 </p>
               </div>
             </div>
             {canWrite && (
               <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-slate-500">{fy.isActive ? 'Active' : 'Inactive'}</span>
+                <span className="text-xs font-medium text-muted">{fy.isActive ? 'Active' : 'Inactive'}</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={fy.isActive}
                   onClick={() => updateM.mutate({ id: fy.id, data: { name: fy.name, startDate: fy.startDate, endDate: fy.endDate, isActive: !fy.isActive } })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fy.isActive ? 'bg-primary' : 'bg-slate-300'}`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fy.isActive ? 'bg-primary' : 'bg-line'}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fy.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
@@ -114,7 +114,7 @@ export default function FinancialYears() {
               <DatePicker required value={form.endDate} onChange={(iso) => setForm({ ...form, endDate: iso })} />
             </Field>
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-ink/80">
             <input
               type="checkbox"
               checked={form.isActive}
@@ -123,10 +123,10 @@ export default function FinancialYears() {
             Mark as active
           </label>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
               Add Financial Year
             </button>
           </div>

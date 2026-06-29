@@ -128,7 +128,7 @@ export default function FundReceipts() {
         <div className="overflow-x-auto">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-5 py-3 font-medium">Date</th>
               <th className="px-5 py-3 font-medium">Company</th>
               <th className="px-5 py-3 font-medium">Year</th>
@@ -141,19 +141,19 @@ export default function FundReceipts() {
           </thead>
           <tbody>
             {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                <td className="px-5 py-3 text-slate-700">{formatDate(r.date)}</td>
-                <td className="px-5 py-3 text-slate-700">{companyName(r.companyId)}</td>
-                <td className="px-5 py-3 text-slate-500">{yearName(r.financialYearId)}</td>
-                <td className="px-5 py-3 text-slate-500">{r.reference}</td>
-                <td className="px-5 py-3 text-slate-500">{r.mode}</td>
-                <td className="px-5 py-3 text-right text-slate-500">{formatINR(r.carryForward)}</td>
+              <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
+                <td className="px-5 py-3 text-ink/80">{formatDate(r.date)}</td>
+                <td className="px-5 py-3 text-ink/80">{companyName(r.companyId)}</td>
+                <td className="px-5 py-3 text-muted">{yearName(r.financialYearId)}</td>
+                <td className="px-5 py-3 text-muted">{r.reference}</td>
+                <td className="px-5 py-3 text-muted">{r.mode}</td>
+                <td className="px-5 py-3 text-right text-muted">{formatINR(r.carryForward)}</td>
                 <td className="px-5 py-3 text-right font-semibold text-success">{formatINR(r.amount)}</td>
                 {canWrite && (
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-3">
-                      <button onClick={() => openEdit(r)} className="text-slate-400 hover:text-primary"><Pencil size={16} /></button>
-                      <button onClick={() => setDeleteId(r.id)} className="text-slate-400 hover:text-danger"><Trash2 size={16} /></button>
+                      <button onClick={() => openEdit(r)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
+                      <button onClick={() => setDeleteId(r.id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 )}
@@ -195,10 +195,10 @@ export default function FundReceipts() {
           <Field label="Amount (₹)">
             <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
           </Field>
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
+          {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Receipt'}</button>
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">Cancel</button>
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Receipt'}</button>
           </div>
         </form>
       </Modal>

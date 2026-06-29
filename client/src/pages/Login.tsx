@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Lock, Mail } from '../components/icons'
+import { Lock, Mail } from '../components/icons'
 import { homePathForRole, useAuth } from '../context/AuthContext'
 import { getErrorMessage } from '../lib/errors'
 
@@ -27,22 +27,26 @@ export default function Login() {
   }
 
   const inputWrap =
-    'w-full rounded-lg border border-slate-300 py-2.5 pl-10 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
+    'w-full rounded-xl border border-line bg-surface/60 py-2.5 pl-10 pr-3 text-sm text-ink placeholder:text-muted shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-sidebar px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0F172A] px-4">
+      {/* Ambient gradient blobs */}
+      <div className="pointer-events-none absolute -left-32 -top-32 h-80 w-80 rounded-full bg-primary/30 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl" />
+
+      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-surface p-8 shadow-2xl animate-scale-in">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-white">
-            <Building2 size={24} />
+          <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-line">
+            <img src="/logo.png" alt="CSR Fund Manager" className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">CSR Manager</h1>
-          <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">CSR Fund Manager</h1>
+          <p className="mt-1 text-sm text-muted">Sign in to your account</p>
         </div>
 
         <form onSubmit={onLogin} className="space-y-4">
           <div className="relative">
-            <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="email"
               required
@@ -53,7 +57,7 @@ export default function Login() {
             />
           </div>
           <div className="relative">
-            <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="password"
               required
@@ -64,23 +68,23 @@ export default function Login() {
             />
           </div>
 
-          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{error}</p>}
+          {error && <p className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-accent py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-dark disabled:opacity-50"
+            className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all hover:bg-primary-dark hover:shadow-md active:scale-[0.99] disabled:opacity-50"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-          <p className="font-medium text-slate-600">Administrator login</p>
+        <div className="mt-5 rounded-xl border border-line bg-ink/[0.03] p-3 text-xs text-muted">
+          <p className="font-medium text-ink">Administrator login</p>
           <p>admin@csr.com / Admin@123</p>
         </div>
 
-        <p className="mt-5 text-center text-xs text-slate-400">
+        <p className="mt-5 text-center text-xs text-muted">
           Editor &amp; viewer accounts are created by the administrator from the Admin Panel.
         </p>
       </div>

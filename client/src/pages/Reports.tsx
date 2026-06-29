@@ -259,7 +259,7 @@ export default function Reports() {
         "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
         tab === id
           ? "border-primary text-primary"
-          : "border-transparent text-slate-500 hover:text-slate-700",
+          : "border-transparent text-muted hover:text-ink",
       ].join(" ")}
     >
       {label}
@@ -276,14 +276,14 @@ export default function Reports() {
               <button
                 onClick={() => onExport("pdf")}
                 disabled={exporting !== null}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-ink/5 disabled:opacity-50"
               >
                 <FileText size={16} /> {exporting === "pdf" ? "Exporting…" : "Export PDF"}
               </button>
               <button
                 onClick={() => onExport("excel")}
                 disabled={exporting !== null}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-dark disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-accent-dark disabled:opacity-50"
               >
                 <FileDown size={16} /> {exporting === "excel" ? "Exporting…" : "Export Excel"}
               </button>
@@ -317,7 +317,7 @@ export default function Reports() {
         </Select>
       </div>
 
-      <div className="mb-5 flex gap-1 border-b border-slate-200">
+      <div className="mb-5 flex gap-1 border-b border-line">
         {tabBtn("year", "Year-wise Summary")}
         {tabBtn("company", "Company-wise Summary")}
         {tabBtn("project", "Project-wise Summary")}
@@ -327,7 +327,7 @@ export default function Reports() {
         {tab === "year" && (
           <>
             <Card className="mb-6 p-5">
-              <h2 className="mb-4 font-semibold text-slate-800">
+              <h2 className="mb-4 font-semibold text-ink">
                 Fund Flow by Financial Year
               </h2>
               <ResponsiveContainer width="100%" height={320}>
@@ -335,39 +335,47 @@ export default function Reports() {
                   <CartesianGrid
                     strokeDasharray="3 3"
                     vertical={false}
-                    stroke="#e2e8f0"
+                    stroke="rgba(148,163,184,0.22)"
                   />
                   <XAxis
                     dataKey="name"
                     tickLine={false}
-                    axisLine={{ stroke: "#cbd5e1" }}
-                    fontSize={12}
+                    axisLine={{ stroke: "rgba(148,163,184,0.22)" }}
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
                   />
                   <YAxis
                     tickFormatter={formatLakhAxis}
                     tickLine={false}
                     axisLine={false}
-                    fontSize={12}
+                    tick={{ fill: "#94a3b8", fontSize: 12 }}
                   />
-                  <Tooltip formatter={(v: number) => formatINR(v)} />
+                  <Tooltip
+                    formatter={(v: number) => formatINR(v)}
+                    contentStyle={{
+                      background: "rgb(var(--color-surface))",
+                      border: "1px solid rgb(var(--color-line))",
+                      borderRadius: 12,
+                      color: "rgb(var(--color-ink))",
+                    }}
+                  />
                   <Legend />
                   <Bar
                     dataKey="fundsReceived"
                     name="Received"
-                    fill="#009ca6"
-                    radius={[4, 4, 0, 0]}
+                    fill="#2563EB"
+                    radius={[6, 6, 0, 0]}
                   />
                   <Bar
                     dataKey="carryForwardIn"
                     name="Carry In"
-                    fill="#80cdd2"
-                    radius={[4, 4, 0, 0]}
+                    fill="#60A5FA"
+                    radius={[6, 6, 0, 0]}
                   />
                   <Bar
                     dataKey="expenditure"
                     name="Expenditure"
-                    fill="#f58220"
-                    radius={[4, 4, 0, 0]}
+                    fill="#F59E0B"
+                    radius={[6, 6, 0, 0]}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -377,7 +385,7 @@ export default function Reports() {
               <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
                     <th className="px-5 py-3 font-medium">Financial Year</th>
                     <Th>Funds Received</Th>
                     <Th>Carry Forward In</Th>
@@ -389,8 +397,8 @@ export default function Reports() {
                 </thead>
                 <tbody>
                   {yearRows.map((r) => (
-                    <tr key={r.name} className="border-b border-slate-100">
-                      <td className="px-5 py-3 font-medium text-slate-800">
+                    <tr key={r.name} className="border-b border-line/60 transition-colors hover:bg-ink/[0.03]">
+                      <td className="px-5 py-3 font-medium text-ink">
                         {r.name}
                       </td>
                       <Td>{formatINR(r.fundsReceived)}</Td>
@@ -403,8 +411,8 @@ export default function Reports() {
                       <Td>{formatINR(r.carryForwardOut)}</Td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-50 font-semibold">
-                    <td className="px-5 py-3 text-slate-800">Total</td>
+                  <tr className="bg-ink/[0.03] font-semibold">
+                    <td className="px-5 py-3 text-ink">Total</td>
                     <Td>{formatINR(yearTotals.fundsReceived)}</Td>
                     <Td>{formatINR(yearTotals.carryForwardIn)}</Td>
                     <Td>{formatINR(yearTotals.totalAvailable)}</Td>
@@ -428,7 +436,7 @@ export default function Reports() {
             <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
                   <th className="px-5 py-3 font-medium">Company</th>
                   <Th>Total Received</Th>
                   <Th>Carry Forward</Th>
@@ -441,9 +449,9 @@ export default function Reports() {
                 {companyRows.map((r) => (
                   <tr
                     key={r.name}
-                    className="border-b border-slate-100 last:border-0"
+                    className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]"
                   >
-                    <td className="px-5 py-3 font-medium text-slate-800">
+                    <td className="px-5 py-3 font-medium text-ink">
                       {r.name}
                     </td>
                     <Td>{formatINR(r.received)}</Td>
@@ -464,7 +472,7 @@ export default function Reports() {
             <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
                   <th className="px-5 py-3 font-medium">Project</th>
                   <th className="px-5 py-3 font-medium">Company</th>
                   <th className="px-5 py-3 font-medium">Year</th>
@@ -478,17 +486,17 @@ export default function Reports() {
                 {projectRows.map((r) => (
                   <tr
                     key={r.name}
-                    className="border-b border-slate-100 last:border-0"
+                    className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]"
                   >
-                    <td className="px-5 py-3 font-medium text-slate-800">
+                    <td className="px-5 py-3 font-medium text-ink">
                       {r.name}
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{r.company}</td>
-                    <td className="px-5 py-3 text-slate-500">{r.year}</td>
+                    <td className="px-5 py-3 text-muted">{r.company}</td>
+                    <td className="px-5 py-3 text-muted">{r.year}</td>
                     <Td>{formatINR(r.budget)}</Td>
                     <Td className="text-danger">{formatINR(r.spent)}</Td>
                     <Td>{r.utilization}%</Td>
-                    <td className="px-5 py-3 capitalize text-slate-600">
+                    <td className="px-5 py-3 capitalize text-ink/80">
                       {r.status}
                     </td>
                   </tr>
@@ -514,7 +522,7 @@ function Td({
   className?: string;
 }) {
   return (
-    <td className={`px-5 py-3 text-right text-slate-700 ${className}`}>
+    <td className={`px-5 py-3 text-right text-ink/80 ${className}`}>
       {children}
     </td>
   );

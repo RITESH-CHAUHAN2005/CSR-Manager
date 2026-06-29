@@ -34,11 +34,11 @@ export default function UserDashboard() {
           <UserCircle size={36} />
         </div>
         <div className="flex-1">
-          <p className="text-lg font-semibold text-slate-900">{user?.name}</p>
-          <p className="text-sm text-slate-500">{user?.email}</p>
+          <p className="text-lg font-semibold text-ink">{user?.name}</p>
+          <p className="text-sm text-muted">{user?.email}</p>
         </div>
         <div className="text-right">
-          <p className="mb-1 text-xs text-slate-400">Role</p>
+          <p className="mb-1 text-xs text-muted">Role</p>
           <span className="inline-flex rounded-md bg-accent/10 px-2 py-0.5 text-xs font-medium capitalize text-accent-dark">
             {user?.role ?? 'editor'}
           </span>
@@ -54,9 +54,9 @@ export default function UserDashboard() {
 
       {/* My records */}
       <Card className="mb-6 p-5">
-        <h2 className="mb-4 font-semibold text-slate-800">My Records</h2>
+        <h2 className="mb-4 font-semibold text-ink">My Records</h2>
         {myProjects.length + myReceipts.length + myExpenditures.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">
+          <p className="py-6 text-center text-sm text-muted">
             You haven't created any records yet. Add a project, fund receipt, or expenditure to get started.
           </p>
         ) : (
@@ -76,24 +76,24 @@ export default function UserDashboard() {
 
       {/* My activity */}
       <Card className="p-5">
-        <h2 className="mb-4 font-semibold text-slate-800">My Activity</h2>
+        <h2 className="mb-4 font-semibold text-ink">My Activity</h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+              <tr className="sticky top-0 z-10 border-b border-line bg-surface/85 text-left text-xs uppercase tracking-wide text-muted backdrop-blur">
                 <th className="px-3 py-3 font-medium">When</th>
                 <th className="px-3 py-3 font-medium">Activity</th>
               </tr>
             </thead>
             <tbody>
               {myLogs.map((l) => (
-                <tr key={l.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatTimestamp(l.createdAt)}</td>
-                  <td className="px-3 py-3 text-slate-700">{describeLog(l)}</td>
+                <tr key={l.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-ink/[0.03]">
+                  <td className="px-3 py-3 whitespace-nowrap text-muted">{formatTimestamp(l.createdAt)}</td>
+                  <td className="px-3 py-3 text-ink/80">{describeLog(l)}</td>
                 </tr>
               ))}
               {myLogs.length === 0 && (
-                <tr><td colSpan={2} className="py-8 text-center text-sm text-slate-400">No activity yet.</td></tr>
+                <tr><td colSpan={2} className="py-8 text-center text-sm text-muted">No activity yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -105,24 +105,24 @@ export default function UserDashboard() {
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <Card className="p-5">
+    <Card className="lift p-5">
       <div className="flex items-start justify-between">
-        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-sm text-muted">{label}</p>
         <span className="text-primary">{icon}</span>
       </div>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </Card>
   )
 }
 
 function Row({ type, label, value }: { type: string; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-slate-100 px-4 py-2.5">
+    <div className="flex items-center justify-between rounded-lg border border-line/60 px-4 py-2.5">
       <div className="flex items-center gap-3">
         <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{type}</span>
-        <span className="text-slate-700">{label}</span>
+        <span className="text-ink/80">{label}</span>
       </div>
-      <span className="font-medium text-slate-800">{value}</span>
+      <span className="font-medium text-ink">{value}</span>
     </div>
   )
 }

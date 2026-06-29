@@ -17,15 +17,15 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
       {action}
     </div>
   )
 }
 
-// ---------------- PrimaryButton ----------------
+// ---------------- Buttons ----------------
 export function PrimaryButton({
   children,
   icon = true,
@@ -34,9 +34,37 @@ export function PrimaryButton({
   return (
     <button
       {...props}
-      className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-dark disabled:opacity-50"
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-primary/25 transition-all duration-200 hover:bg-primary-dark hover:shadow-md hover:shadow-primary/30 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none"
     >
       {icon && <Plus size={16} weight="bold" />}
+      {children}
+    </button>
+  )
+}
+
+export function SecondaryButton({
+  children,
+  ...props
+}: { children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...props}
+      className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-ink shadow-sm backdrop-blur transition-all duration-200 hover:bg-ink/5 active:scale-[0.98] disabled:opacity-50"
+    >
+      {children}
+    </button>
+  )
+}
+
+export function DangerButton({
+  children,
+  ...props
+}: { children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...props}
+      className="inline-flex items-center justify-center gap-2 rounded-xl bg-danger px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-danger/25 transition-all duration-200 hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+    >
       {children}
     </button>
   )
@@ -45,16 +73,16 @@ export function PrimaryButton({
 // ---------------- StatusBadge ----------------
 export function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: 'bg-green-100 text-green-700',
-    completed: 'bg-teal-100 text-teal-700',
-    approved: 'bg-green-100 text-green-700',
-    pending: 'bg-orange-100 text-orange-700',
-    rejected: 'bg-red-100 text-red-700',
+    active: 'bg-success/15 text-success ring-success/20',
+    completed: 'bg-primary/15 text-primary ring-primary/20',
+    approved: 'bg-success/15 text-success ring-success/20',
+    pending: 'bg-warning/15 text-warning ring-warning/25',
+    rejected: 'bg-danger/15 text-danger ring-danger/20',
   }
   return (
     <span
-      className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
-        styles[status] ?? 'bg-slate-100 text-slate-600'
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ring-1 ring-inset ${
+        styles[status] ?? 'bg-ink/10 text-muted ring-ink/10'
       }`}
     >
       {status}
@@ -62,7 +90,7 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
-// ---------------- Select ----------------
+// ---------------- Select (filter dropdown) ----------------
 export function Select({
   children,
   className = '',
@@ -72,13 +100,13 @@ export function Select({
     <div className="relative inline-block w-full sm:w-auto">
       <select
         {...props}
-        className={`w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-9 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-52 ${className}`}
+        className={`w-full appearance-none rounded-xl border border-line bg-surface/70 px-3.5 py-2.5 pr-9 text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30 sm:w-52 ${className}`}
       >
         {children}
       </select>
       <ChevronDown
         size={16}
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
       />
     </div>
   )
@@ -96,24 +124,20 @@ export function SearchInput({
 }) {
   return (
     <div className="relative w-full sm:w-auto">
-      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary sm:w-64"
+        className="w-full rounded-xl border border-line bg-surface/70 py-2.5 pl-10 pr-3 text-sm text-ink placeholder:text-muted shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30 sm:w-64"
       />
     </div>
   )
 }
 
-// ---------------- Card ----------------
+// ---------------- Card (glassmorphism) ----------------
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
-      {children}
-    </div>
-  )
+  return <div className={`glass-card rounded-2xl ${className}`}>{children}</div>
 }
 
 // ---------------- Modal ----------------
@@ -130,11 +154,14 @@ export function Modal({
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-lg rounded-2xl border border-line bg-surface shadow-lift animate-scale-in">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-muted transition-colors hover:bg-ink/5 hover:text-ink"
+          >
             <X size={20} />
           </button>
         </div>
@@ -148,14 +175,14 @@ export function Modal({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       {children}
     </label>
   )
 }
 
 const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
+  'w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2.5 text-sm text-ink placeholder:text-muted shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:opacity-60'
 
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />
@@ -163,6 +190,20 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={inputClass} />
+}
+
+export function FormSelect({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div className="relative">
+      <select {...props} className={`${inputClass} appearance-none pr-9`}>
+        {children}
+      </select>
+      <ChevronDown
+        size={16}
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+      />
+    </div>
+  )
 }
 
 // ---------------- DatePicker (flatpickr) ----------------
@@ -196,10 +237,12 @@ export function DatePicker({
       defaultDate: value || undefined,
       onChange: (_dates, iso) => onChangeRef.current(iso),
     }) as Instance
-    // Mirror the `required` flag onto the visible (alt) input so native form
-    // validation works without a hidden required input breaking focus.
-    if (required && fp.altInput) fp.altInput.required = true
-    if (fp.altInput) fp.altInput.placeholder = placeholder
+    // Mirror the `required` flag and styling onto the visible (alt) input.
+    if (fp.altInput) {
+      fp.altInput.className = inputClass
+      fp.altInput.placeholder = placeholder
+      if (required) fp.altInput.required = true
+    }
     fpRef.current = fp
     return () => fp.destroy()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,14 +257,6 @@ export function DatePicker({
   }, [value])
 
   return <input ref={ref} type="text" className={inputClass} />
-}
-
-export function FormSelect({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select {...props} className={inputClass}>
-      {children}
-    </select>
-  )
 }
 
 // ---------------- ConfirmDialog ----------------
@@ -240,20 +275,20 @@ export function ConfirmDialog({
 }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-        <p className="mt-2 text-sm text-slate-500">{message}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-lift animate-scale-in">
+        <h2 className="text-lg font-semibold text-ink">{title}</h2>
+        <p className="mt-2 text-sm text-muted">{message}</p>
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-danger/25 transition-all hover:opacity-90 active:scale-[0.98]"
           >
             Delete
           </button>

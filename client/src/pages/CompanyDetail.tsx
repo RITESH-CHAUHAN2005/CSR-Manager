@@ -109,14 +109,14 @@ export default function CompanyDetail() {
   if (companies.length > 0 && !company) {
     return (
       <div className="py-20 text-center">
-        <p className="text-slate-500">This company no longer exists.</p>
+        <p className="text-muted">This company no longer exists.</p>
         <button onClick={() => navigate('/companies')} className="mt-4 text-sm font-medium text-primary hover:underline">
           ← Back to Companies
         </button>
       </div>
     )
   }
-  if (!company) return <p className="py-20 text-center text-sm text-slate-400">Loading…</p>
+  if (!company) return <p className="py-20 text-center text-sm text-muted">Loading…</p>
 
   return (
     <>
@@ -125,20 +125,20 @@ export default function CompanyDetail() {
         <div className="flex items-start gap-3">
           <button
             onClick={() => navigate('/companies')}
-            className="mt-1 rounded-lg border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-50"
+            className="mt-1 rounded-xl border border-line p-1.5 text-muted hover:bg-ink/5"
             aria-label="Back to companies"
           >
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">{company.name}</h1>
-            {company.cin && <p className="mt-0.5 text-sm text-slate-400">#&nbsp;{company.cin}</p>}
+            <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{company.name}</h1>
+            {company.cin && <p className="mt-0.5 text-sm text-muted">#&nbsp;{company.cin}</p>}
           </div>
         </div>
         {canWrite && (
           <button
             onClick={openEdit}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5"
           >
             <Pencil size={15} /> Edit
           </button>
@@ -148,31 +148,31 @@ export default function CompanyDetail() {
       {/* Contact + Fund overview */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Contact Information</h2>
-          <div className="space-y-3 text-sm text-slate-600">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Contact Information</h2>
+          <div className="space-y-3 text-sm text-ink/80">
             {company.contactPerson && (
-              <p className="flex items-center gap-3"><User size={16} className="text-slate-400" /> {company.contactPerson}</p>
+              <p className="flex items-center gap-3"><User size={16} className="text-muted" /> {company.contactPerson}</p>
             )}
             {company.email && (
-              <p className="flex items-center gap-3"><Mail size={16} className="text-slate-400" /> {company.email}</p>
+              <p className="flex items-center gap-3"><Mail size={16} className="text-muted" /> {company.email}</p>
             )}
             {company.phone && (
-              <p className="flex items-center gap-3"><Phone size={16} className="text-slate-400" /> {company.phone}</p>
+              <p className="flex items-center gap-3"><Phone size={16} className="text-muted" /> {company.phone}</p>
             )}
             {company.address && (
-              <p className="flex items-start gap-3"><MapPin size={16} className="mt-0.5 shrink-0 text-slate-400" /> {company.address}</p>
+              <p className="flex items-start gap-3"><MapPin size={16} className="mt-0.5 shrink-0 text-muted" /> {company.address}</p>
             )}
             {!company.contactPerson && !company.email && !company.phone && !company.address && (
-              <p className="text-slate-400">No contact details on file.</p>
+              <p className="text-muted">No contact details on file.</p>
             )}
             {company.notes && (
-              <p className="mt-2 border-t border-slate-100 pt-3 text-slate-500">{company.notes}</p>
+              <p className="mt-2 border-t border-line/60 pt-3 text-muted">{company.notes}</p>
             )}
           </div>
         </Card>
 
         <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Fund Overview</h2>
+          <h2 className="mb-4 text-lg font-semibold text-ink">Fund Overview</h2>
           <div className="grid grid-cols-2 gap-3">
             <OverviewStat label="Total Received" value={formatINR(totalReceived)} />
             <OverviewStat label="Carry Forward" value={formatINR(carryForward)} />
@@ -184,14 +184,14 @@ export default function CompanyDetail() {
 
       {/* Year-wise fund summary */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Year-wise Fund Summary</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">Year-wise Fund Summary</h2>
         {yearRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No fund activity recorded yet.</p>
+          <p className="py-6 text-center text-sm text-muted">No fund activity recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
                   <th className="px-3 py-3 font-medium">Financial Year</th>
                   <th className="px-3 py-3 text-right font-medium">Received</th>
                   <th className="px-3 py-3 text-right font-medium">Carry Forward In</th>
@@ -202,13 +202,13 @@ export default function CompanyDetail() {
               </thead>
               <tbody>
                 {yearRows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 last:border-0">
-                    <td className="px-3 py-3 font-medium text-slate-700">{r.name}</td>
-                    <td className="px-3 py-3 text-right text-slate-600">{formatINR(r.received)}</td>
-                    <td className="px-3 py-3 text-right text-slate-500">{formatINR(r.carryForwardIn)}</td>
+                  <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
+                    <td className="px-3 py-3 font-medium text-ink/80">{r.name}</td>
+                    <td className="px-3 py-3 text-right text-ink/80">{formatINR(r.received)}</td>
+                    <td className="px-3 py-3 text-right text-muted">{formatINR(r.carryForwardIn)}</td>
                     <td className="px-3 py-3 text-right text-danger">{formatINR(r.expenditure)}</td>
                     <td className="px-3 py-3 text-right font-semibold text-success">{formatINR(r.balance)}</td>
-                    <td className="px-3 py-3 text-right text-slate-500">{formatINR(r.balance)}</td>
+                    <td className="px-3 py-3 text-right text-muted">{formatINR(r.balance)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -219,21 +219,21 @@ export default function CompanyDetail() {
 
       {/* Projects */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Projects</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">Projects</h2>
         {myProjects.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No projects yet.</p>
+          <p className="py-6 text-center text-sm text-muted">No projects yet.</p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line/60">
             {myProjects.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{p.name}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-medium text-ink">{p.name}</p>
+                  <p className="text-xs text-muted">
                     {yearName(p.financialYearId)} · {p.category} · {p.location}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-semibold text-slate-800">{formatINR(p.budget)}</span>
+                  <span className="font-semibold text-ink">{formatINR(p.budget)}</span>
                   <StatusBadge status={p.status} />
                 </div>
               </div>
@@ -244,14 +244,14 @@ export default function CompanyDetail() {
 
       {/* Fund receipts */}
       <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Fund Receipts</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">Fund Receipts</h2>
         {myReceipts.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-400">No fund receipts yet.</p>
+          <p className="py-6 text-center text-sm text-muted">No fund receipts yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
                   <th className="px-3 py-3 font-medium">Date</th>
                   <th className="px-3 py-3 font-medium">Year</th>
                   <th className="px-3 py-3 font-medium">Reference</th>
@@ -264,12 +264,12 @@ export default function CompanyDetail() {
                 {[...myReceipts]
                   .sort((a, b) => a.date.localeCompare(b.date))
                   .map((r) => (
-                    <tr key={r.id} className="border-b border-slate-100 last:border-0">
-                      <td className="px-3 py-3 text-slate-700">{formatDate(r.date)}</td>
-                      <td className="px-3 py-3 text-slate-500">{yearName(r.financialYearId)}</td>
-                      <td className="px-3 py-3 text-slate-500">{r.reference}</td>
-                      <td className="px-3 py-3 text-slate-500">{r.mode}</td>
-                      <td className="px-3 py-3 text-right text-slate-500">{formatINR(r.carryForward)}</td>
+                    <tr key={r.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
+                      <td className="px-3 py-3 text-ink/80">{formatDate(r.date)}</td>
+                      <td className="px-3 py-3 text-muted">{yearName(r.financialYearId)}</td>
+                      <td className="px-3 py-3 text-muted">{r.reference}</td>
+                      <td className="px-3 py-3 text-muted">{r.mode}</td>
+                      <td className="px-3 py-3 text-right text-muted">{formatINR(r.carryForward)}</td>
                       <td className="px-3 py-3 text-right font-semibold text-success">{formatINR(r.amount)}</td>
                     </tr>
                   ))}
@@ -305,12 +305,12 @@ export default function CompanyDetail() {
           <Field label="Notes">
             <TextArea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
+          {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setEditOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => setEditOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
               Save Changes
             </button>
           </div>
@@ -322,9 +322,9 @@ export default function CompanyDetail() {
 
 function OverviewStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-4 py-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+    <div className="rounded-xl bg-ink/[0.03] px-4 py-3">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 text-lg font-bold text-ink">{value}</p>
     </div>
   )
 }

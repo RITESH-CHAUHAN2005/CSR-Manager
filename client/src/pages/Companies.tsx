@@ -117,31 +117,31 @@ export default function Companies() {
         {filtered.map((c) => {
           const p = posById[c.id]
           return (
-            <Card key={c.id} className="flex flex-col p-5">
+            <Card key={c.id} className="lift flex flex-col p-5">
               <div className="mb-3">
-                <h3 className="text-lg font-semibold text-slate-900">{c.name}</h3>
-                {c.cin && <p className="text-xs uppercase tracking-wide text-slate-400">{c.cin}</p>}
+                <h3 className="text-lg font-semibold text-ink">{c.name}</h3>
+                {c.cin && <p className="text-xs uppercase tracking-wide text-muted">{c.cin}</p>}
               </div>
 
-              <div className="space-y-1.5 text-sm text-slate-600">
+              <div className="space-y-1.5 text-sm text-ink/80">
                 {c.contactPerson && (
                   <p className="flex items-center gap-2">
-                    <User size={14} className="text-slate-400" /> {c.contactPerson}
+                    <User size={14} className="text-muted" /> {c.contactPerson}
                   </p>
                 )}
                 {c.email && (
                   <p className="flex items-center gap-2">
-                    <Mail size={14} className="text-slate-400" /> {c.email}
+                    <Mail size={14} className="text-muted" /> {c.email}
                   </p>
                 )}
                 {c.phone && (
                   <p className="flex items-center gap-2">
-                    <Phone size={14} className="text-slate-400" /> {c.phone}
+                    <Phone size={14} className="text-muted" /> {c.phone}
                   </p>
                 )}
               </div>
 
-              <div className="my-4 grid grid-cols-2 gap-y-3 border-t border-slate-100 pt-4 text-sm">
+              <div className="my-4 grid grid-cols-2 gap-y-3 border-t border-line/60 pt-4 text-sm">
                 <Stat label="Received" value={formatINR(p?.totalReceived ?? 0)} />
                 <Stat label="Balance" value={formatINR(p?.balance ?? 0)} valueClass="text-success" />
                 <Stat label="Projects" value={String(p?.projects ?? 0)} />
@@ -154,19 +154,19 @@ export default function Companies() {
 
               <button
                 onClick={() => navigate(`/companies/${c.id}`)}
-                className="mt-auto flex items-center justify-between rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                className="mt-auto flex items-center justify-between rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
               >
                 View Details <ChevronRight size={16} />
               </button>
 
               {canWrite && (
                 <div className="mt-2 flex justify-end gap-3 text-xs">
-                  <button onClick={() => openEdit(c)} className="text-slate-500 hover:text-primary">
+                  <button onClick={() => openEdit(c)} className="text-muted hover:text-primary">
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteId(c.id)}
-                    className="text-slate-500 hover:text-danger"
+                    className="text-muted hover:text-danger"
                   >
                     Delete
                   </button>
@@ -239,12 +239,12 @@ export default function Companies() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </Field>
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
+          {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setFormOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => setFormOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
               {editing ? 'Save Changes' : 'Add Company'}
             </button>
           </div>
@@ -265,10 +265,10 @@ export default function Companies() {
   )
 }
 
-function Stat({ label, value, valueClass = 'text-slate-900' }: { label: string; value: string; valueClass?: string }) {
+function Stat({ label, value, valueClass = 'text-ink' }: { label: string; value: string; valueClass?: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-400">{label}</p>
+      <p className="text-xs text-muted">{label}</p>
       <p className={`font-semibold ${valueClass}`}>{value}</p>
     </div>
   )

@@ -22,7 +22,7 @@ const UserDashboard = lazy(() => import('./pages/UserDashboard'))
 
 function PageFallback() {
   return (
-    <div className="flex h-screen items-center justify-center bg-canvas text-slate-500">
+    <div className="flex h-screen items-center justify-center bg-canvas text-muted">
       Loading…
     </div>
   )

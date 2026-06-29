@@ -150,7 +150,7 @@ export default function Expenditures() {
         <div className="overflow-x-auto">
         <table className="w-full min-w-[820px] text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-400">
+            <tr className="sticky top-0 z-10 bg-surface/85 backdrop-blur border-b border-line text-left text-xs uppercase tracking-wide text-muted">
               <th className="px-5 py-3 font-medium">Date</th>
               <th className="px-5 py-3 font-medium">Project</th>
               <th className="px-5 py-3 font-medium">Company</th>
@@ -163,19 +163,19 @@ export default function Expenditures() {
           </thead>
           <tbody>
             {filtered.map((e) => (
-              <tr key={e.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                <td className="px-5 py-3 text-slate-700">{formatDate(e.date)}</td>
-                <td className="px-5 py-3 text-slate-700">{projectName(e.projectId)}</td>
-                <td className="px-5 py-3 text-slate-500">{companyName(e.companyId)}</td>
-                <td className="px-5 py-3 text-slate-500">{yearName(e.financialYearId)}</td>
-                <td className="px-5 py-3 text-slate-500">{e.category}</td>
-                <td className="px-5 py-3 text-slate-500">{e.approvedBy}</td>
+              <tr key={e.id} className="border-b border-line/60 last:border-0 transition-colors hover:bg-ink/[0.03]">
+                <td className="px-5 py-3 text-ink/80">{formatDate(e.date)}</td>
+                <td className="px-5 py-3 text-ink/80">{projectName(e.projectId)}</td>
+                <td className="px-5 py-3 text-muted">{companyName(e.companyId)}</td>
+                <td className="px-5 py-3 text-muted">{yearName(e.financialYearId)}</td>
+                <td className="px-5 py-3 text-muted">{e.category}</td>
+                <td className="px-5 py-3 text-muted">{e.approvedBy}</td>
                 <td className="px-5 py-3 text-right font-semibold text-danger">{formatINR(e.amount)}</td>
                 {canWrite && (
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-3">
-                      <button onClick={() => openEdit(e)} className="text-slate-400 hover:text-primary"><Pencil size={16} /></button>
-                      <button onClick={() => setDeleteId(e.id)} className="text-slate-400 hover:text-danger"><Trash2 size={16} /></button>
+                      <button onClick={() => openEdit(e)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
+                      <button onClick={() => setDeleteId(e.id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 )}
@@ -216,10 +216,10 @@ export default function Expenditures() {
           <Field label="Amount (₹)">
             <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
           </Field>
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
+          {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Expenditure'}</button>
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">Cancel</button>
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Expenditure'}</button>
           </div>
         </form>
       </Modal>

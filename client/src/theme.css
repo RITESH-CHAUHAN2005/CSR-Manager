@@ -1,30 +1,80 @@
 /*
- * THEME TOKENS — single source of truth for the app's color scheme.
- * 60-30-10 palette:
- *   60% Neutral  — Light Grey  #f4f7f6  (page background / surfaces)
- *   30% Brand    — Corporate Teal #009ca6 (sidebar, nav, icons, secondary headings)
- *   10% Accent   — Vibrant Orange #f58220 (CTA buttons, attention numbers)
- * Values are space-separated RGB channels so Tailwind can apply opacity.
+ * THEME TOKENS — single source of truth for the app's color system.
+ * Premium enterprise SaaS palette (Linear / Stripe / Vercel inspired).
+ * Values are space-separated RGB channels so Tailwind can apply opacity
+ * via `rgb(var(--token) / <alpha-value>)`.
+ *
+ * Two themes: light (:root) and dark (.dark on <html>). The theme toggle in
+ * the header flips the `.dark` class; the choice is persisted in localStorage.
  */
 :root {
-  /* Brand teal (primary / navigation) */
-  --color-primary: 0 156 166;        /* #009ca6 teal */
-  --color-primary-dark: 0 128 137;   /* #008089 darker teal */
-  --color-primary-light: 77 188 196; /* #4dbcc4 light teal */
+  /* Surfaces */
+  --color-bg: 248 250 252;        /* #F8FAFC soft white page bg */
+  --color-surface: 255 255 255;   /* #FFFFFF card base (glass applies alpha) */
+  --color-ink: 15 23 42;          /* #0F172A primary text */
+  --color-muted: 100 116 139;     /* #64748B secondary text */
+  --color-line: 226 232 240;      /* #E2E8F0 borders */
 
-  /* Sidebar — teal brand surface */
-  --color-sidebar: 0 128 137;        /* #008089 deep teal */
-  --color-sidebar-hover: 0 156 166;  /* #009ca6 */
-  --color-sidebar-active: 245 130 32;/* #f58220 orange (active nav highlight) */
+  /* Brand — professional blue */
+  --color-primary: 37 99 235;     /* #2563EB */
+  --color-primary-dark: 29 78 216;/* #1D4ED8 */
+  --color-primary-light: 96 165 250; /* #60A5FA */
 
-  /* Accent orange (CTAs / attention) */
-  --color-accent: 245 130 32;        /* #f58220 orange */
-  --color-accent-dark: 219 112 22;   /* #db7016 darker orange */
+  /* Accent is aliased to brand blue so legacy CTAs become blue automatically */
+  --color-accent: 37 99 235;
+  --color-accent-dark: 29 78 216;
 
   /* Status */
-  --color-success: 22 163 74;        /* #16a34a green (positive amounts) */
-  --color-danger: 220 38 38;         /* #dc2626 red (expenditure/delete) */
+  --color-success: 34 197 94;     /* #22C55E */
+  --color-warning: 245 158 11;    /* #F59E0B */
+  --color-danger: 239 68 68;      /* #EF4444 */
 
-  /* Neutral surfaces */
-  --color-canvas: 244 247 246;       /* #f4f7f6 light grey background */
+  /* Sidebar — dark navy */
+  --color-sidebar: 15 23 42;      /* #0F172A */
+  --color-sidebar-hover: 30 41 59;/* #1E293B */
+  --color-canvas: 248 250 252;    /* legacy alias of --color-bg */
+
+  /* Glassmorphism */
+  --glass-alpha: 0.65;
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 32px -14px rgba(15, 23, 42, 0.18);
+  /* Sidebar glass (over the navy bg) */
+  --sidebar-glass-alpha: 0.85;
+
+  /* Ambient background tints behind the glass */
+  --bg-grad: radial-gradient(1200px 600px at 12% -8%, rgba(37, 99, 235, 0.10), transparent 60%),
+             radial-gradient(900px 500px at 100% 0%, rgba(34, 197, 94, 0.08), transparent 55%);
+  color-scheme: light;
+}
+
+.dark {
+  --color-bg: 2 6 23;             /* #020617 */
+  --color-surface: 30 41 59;      /* #1E293B */
+  --color-ink: 248 250 252;       /* #F8FAFC */
+  --color-muted: 148 163 184;     /* #94A3B8 */
+  --color-line: 51 65 85;         /* #334155 */
+
+  --color-primary: 59 130 246;    /* #3B82F6 */
+  --color-primary-dark: 37 99 235;/* #2563EB */
+  --color-primary-light: 96 165 250;
+
+  --color-accent: 59 130 246;
+  --color-accent-dark: 37 99 235;
+
+  --color-success: 34 197 94;
+  --color-warning: 245 158 11;
+  --color-danger: 239 68 68;
+
+  --color-sidebar: 2 6 23;        /* #020617 */
+  --color-sidebar-hover: 30 41 59;
+  --color-canvas: 2 6 23;
+
+  --glass-alpha: 0.55;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -14px rgba(0, 0, 0, 0.65);
+  --sidebar-glass-alpha: 0.7;
+
+  --bg-grad: radial-gradient(1200px 600px at 12% -8%, rgba(59, 130, 246, 0.14), transparent 60%),
+             radial-gradient(900px 500px at 100% 0%, rgba(34, 197, 94, 0.08), transparent 55%);
+  color-scheme: dark;
 }

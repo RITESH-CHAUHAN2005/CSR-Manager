@@ -144,28 +144,28 @@ export default function Projects() {
         {filtered.map((p) => (
           <div
             key={p.id}
-            className="flex items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm"
+            className="flex items-start justify-between gap-4 rounded-2xl border border-line bg-surface px-5 py-4 shadow-sm transition-colors hover:bg-ink/[0.02]"
           >
             <div className="min-w-0">
               <div className="mb-1 flex items-center gap-2">
-                <h3 className="font-semibold text-slate-900">{p.name}</h3>
+                <h3 className="font-semibold text-ink">{p.name}</h3>
                 <StatusBadge status={p.status} />
               </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-500">
-                <span>Company: <span className="text-slate-700">{companyName(p.companyId)}</span></span>
-                <span>Year: <span className="text-slate-700">{yearName(p.financialYearId)}</span></span>
-                <span>Category: <span className="text-slate-700">{p.category}</span></span>
-                <span>Location: <span className="text-slate-700">{p.location}</span></span>
-                <span>Budget: <span className="text-slate-700">{formatINR(p.budget)}</span></span>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
+                <span>Company: <span className="text-ink/80">{companyName(p.companyId)}</span></span>
+                <span>Year: <span className="text-ink/80">{yearName(p.financialYearId)}</span></span>
+                <span>Category: <span className="text-ink/80">{p.category}</span></span>
+                <span>Location: <span className="text-ink/80">{p.location}</span></span>
+                <span>Budget: <span className="text-ink/80">{formatINR(p.budget)}</span></span>
               </div>
               <p className="mt-1 text-sm text-primary">{p.description}</p>
             </div>
             {canWrite && (
               <div className="flex shrink-0 gap-3">
-                <button onClick={() => openEdit(p)} className="text-slate-400 hover:text-primary">
+                <button onClick={() => openEdit(p)} className="text-muted hover:text-primary">
                   <Pencil size={16} />
                 </button>
-                <button onClick={() => setDeleteId(p.id)} className="text-slate-400 hover:text-danger">
+                <button onClick={() => setDeleteId(p.id)} className="text-muted hover:text-danger">
                   <Trash2 size={16} />
                 </button>
               </div>
@@ -173,7 +173,7 @@ export default function Projects() {
           </div>
         ))}
         {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-slate-400">No projects match the filters.</p>
+          <p className="py-10 text-center text-sm text-muted">No projects match the filters.</p>
         )}
       </div>
 
@@ -214,12 +214,12 @@ export default function Projects() {
           <Field label="Description">
             <TextArea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
-          {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
+          {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">
               Cancel
             </button>
-            <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">
               {editing ? 'Save Changes' : 'Add Project'}
             </button>
           </div>
