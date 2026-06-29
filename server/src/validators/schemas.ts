@@ -47,21 +47,25 @@ export const projectSchema = z.object({
   name: z.string().min(1).max(200),
   companyId: objectId,
   financialYearId: objectId,
-  category: z.string().min(1).max(80),
-  location: z.string().min(1).max(160),
-  budget: money,
+  category: z.string().max(80).optional().default(''),
+  location: z.string().max(160).optional().default(''),
+  budget: money.optional().default(0),
   status: z.enum(['active', 'completed']).default('active'),
   description: z.string().max(2000).optional().default(''),
+  startDate: z.string().max(20).optional().default(''),
+  endDate: z.string().max(20).optional().default(''),
+  notes: z.string().max(2000).optional().default(''),
 })
 
 export const fundReceiptSchema = z.object({
   date: isoDate,
   companyId: objectId,
   financialYearId: objectId,
-  reference: z.string().min(1).max(120),
+  reference: z.string().max(120).optional().default(''),
   mode: z.enum(['NEFT', 'RTGS', 'Cheque']),
   carryForward: money.optional().default(0),
   amount: money,
+  notes: z.string().max(2000).optional().default(''),
 })
 
 export const expenditureSchema = z.object({
@@ -69,7 +73,10 @@ export const expenditureSchema = z.object({
   projectId: objectId,
   companyId: objectId,
   financialYearId: objectId,
-  category: z.string().min(1).max(80),
-  approvedBy: z.string().min(1).max(120),
+  category: z.string().max(80).optional().default(''),
+  approvedBy: z.string().max(120).optional().default(''),
   amount: money,
+  description: z.string().max(2000).optional().default(''),
+  reference: z.string().max(120).optional().default(''),
+  notes: z.string().max(2000).optional().default(''),
 })

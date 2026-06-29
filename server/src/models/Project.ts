@@ -10,6 +10,9 @@ export interface IProject extends Document {
   budget: number
   status: 'active' | 'completed'
   description: string
+  startDate?: string
+  endDate?: string
+  notes?: string
 }
 
 const projectSchema = new Schema<IProject>(
@@ -17,11 +20,14 @@ const projectSchema = new Schema<IProject>(
     name: { type: String, required: true, trim: true },
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
     financialYearId: { type: Schema.Types.ObjectId, ref: 'FinancialYear', required: true, index: true },
-    category: { type: String, required: true, trim: true },
-    location: { type: String, required: true, trim: true },
-    budget: { type: Number, required: true, min: 0 },
+    category: { type: String, default: '', trim: true },
+    location: { type: String, default: '', trim: true },
+    budget: { type: Number, default: 0, min: 0 },
     status: { type: String, enum: ['active', 'completed'], default: 'active' },
     description: { type: String, default: '', trim: true },
+    startDate: { type: String, default: '' },
+    endDate: { type: String, default: '' },
+    notes: { type: String, default: '', trim: true },
     ...createdByFields,
   },
   { timestamps: true, toJSON: baseToJSON },

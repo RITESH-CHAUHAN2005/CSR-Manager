@@ -9,6 +9,7 @@ export interface IFundReceipt extends Document {
   mode: 'NEFT' | 'RTGS' | 'Cheque'
   carryForward: number
   amount: number
+  notes?: string
 }
 
 const fundReceiptSchema = new Schema<IFundReceipt>(
@@ -16,10 +17,11 @@ const fundReceiptSchema = new Schema<IFundReceipt>(
     date: { type: String, required: true },
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
     financialYearId: { type: Schema.Types.ObjectId, ref: 'FinancialYear', required: true, index: true },
-    reference: { type: String, required: true, trim: true },
+    reference: { type: String, default: '', trim: true },
     mode: { type: String, enum: ['NEFT', 'RTGS', 'Cheque'], required: true },
     carryForward: { type: Number, default: 0, min: 0 },
     amount: { type: Number, required: true, min: 0 },
+    notes: { type: String, default: '', trim: true },
     ...createdByFields,
   },
   { timestamps: true, toJSON: baseToJSON },

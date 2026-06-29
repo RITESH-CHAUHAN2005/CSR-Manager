@@ -92,6 +92,9 @@ export interface Project extends CreatedBy {
   budget: number
   status: ProjectStatus
   description: string
+  startDate?: string
+  endDate?: string
+  notes?: string
 }
 
 export type PaymentMode = 'NEFT' | 'RTGS' | 'Cheque'
@@ -105,6 +108,7 @@ export interface FundReceipt extends CreatedBy {
   mode: PaymentMode
   carryForward: number
   amount: number
+  notes?: string
 }
 
 export interface Expenditure extends CreatedBy {
@@ -116,6 +120,9 @@ export interface Expenditure extends CreatedBy {
   category: string // Infrastructure, Training, Equipment, Scholarships, Environment...
   approvedBy: string // Trustee Board, Executive Director...
   amount: number
+  description?: string
+  reference?: string
+  notes?: string
 }
 
 // ---- Derived / aggregated shapes (computed, not stored) ----

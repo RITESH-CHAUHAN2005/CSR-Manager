@@ -9,6 +9,9 @@ export interface IExpenditure extends Document {
   category: string
   approvedBy: string
   amount: number
+  description?: string
+  reference?: string
+  notes?: string
 }
 
 const expenditureSchema = new Schema<IExpenditure>(
@@ -17,9 +20,12 @@ const expenditureSchema = new Schema<IExpenditure>(
     projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
     financialYearId: { type: Schema.Types.ObjectId, ref: 'FinancialYear', required: true, index: true },
-    category: { type: String, required: true, trim: true },
-    approvedBy: { type: String, required: true, trim: true },
+    category: { type: String, default: '', trim: true },
+    approvedBy: { type: String, default: '', trim: true },
     amount: { type: Number, required: true, min: 0 },
+    description: { type: String, default: '', trim: true },
+    reference: { type: String, default: '', trim: true },
+    notes: { type: String, default: '', trim: true },
     ...createdByFields,
   },
   { timestamps: true, toJSON: baseToJSON },

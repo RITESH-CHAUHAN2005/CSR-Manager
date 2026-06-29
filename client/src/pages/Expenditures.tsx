@@ -23,19 +23,21 @@ import {
   PrimaryButton,
   SearchInput,
   Select,
+  TextArea,
   TextInput,
 } from '../components/ui'
 
-const CATEGORIES = ['Infrastructure', 'Training', 'Equipment', 'Scholarships', 'Environment']
-const APPROVERS = ['Trustee Board', 'Executive Director']
 const emptyForm = {
   date: '',
   projectId: '',
   companyId: '',
   financialYearId: '',
-  category: 'Infrastructure',
-  approvedBy: 'Trustee Board',
   amount: 0,
+  category: '',
+  approvedBy: '',
+  description: '',
+  reference: '',
+  notes: '',
 }
 
 export default function Expenditures() {
@@ -67,7 +69,7 @@ export default function Expenditures() {
         (!yearFilter || e.financialYearId === yearFilter) &&
         (!q ||
           [e.category, e.approvedBy, projectName(e.projectId), companyName(e.companyId)].some((f) =>
-            f.toLowerCase().includes(q),
+            (f ?? '').toLowerCase().includes(q),
           )),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,7 +107,8 @@ export default function Expenditures() {
     return activeYears
   }, [activeYears, years, form.financialYearId])
 
-  // Selecting a project auto-fills its company and financial year (matches the data model).
+  // Selecting a project auto-fills (and locks) its company, and defaults the financial
+  // year to the project's — an expenditure always belongs to its project's company.
   function pickProject(projectId: string) {
     const proj = projects.find((p) => p.id === projectId)
     setForm((f) => ({
@@ -125,11 +128,12 @@ export default function Expenditures() {
       companyId: first?.companyId ?? '',
       financialYearId: first?.financialYearId ?? '',
     })
+    setFormError('')
     setOpen(true)
   }
   function openEdit(e: Expenditure) {
     setEditing(e)
-    setForm({ ...e })
+    setForm({ ...emptyForm, ...e })
     setFormError('')
     setOpen(true)
   }
@@ -201,32 +205,42 @@ export default function Expenditures() {
             </FormSelect>
           </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Date">
-              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
+            <Field label="Company">
+              {/* Locked to the selected project's company — an expenditure can't be
+                  recorded against a different company than its project. */}
+              <TextInput value={companyName(form.companyId)} readOnly disabled />
             </Field>
             <Field label="Financial Year">
               <FormSelect required value={form.financialYearId} onChange={(e) => setForm({ ...form, financialYearId: e.target.value })}>
                 {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
               </FormSelect>
             </Field>
+            <Field label="Amount (₹)">
+              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+            </Field>
+            <Field label="Date">
+              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
+            </Field>
             <Field label="Category">
-              <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </FormSelect>
+              <TextInput placeholder="e.g. Training, Equipment" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
             </Field>
             <Field label="Approved By">
-              <FormSelect value={form.approvedBy} onChange={(e) => setForm({ ...form, approvedBy: e.target.value })}>
-                {APPROVERS.map((a) => <option key={a} value={a}>{a}</option>)}
-              </FormSelect>
+              <TextInput placeholder="Name or designation" value={form.approvedBy} onChange={(e) => setForm({ ...form, approvedBy: e.target.value })} />
             </Field>
           </div>
-          <Field label="Amount (₹)">
-            <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+          <Field label="Description">
+            <TextArea rows={3} placeholder="What was this expenditure for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </Field>
+          <Field label="Reference Number">
+            <TextInput placeholder="Voucher / bill reference" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+          </Field>
+          <Field label="Notes">
+            <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">Cancel</button>
-            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Expenditure'}</button>
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record'}</button>
           </div>
         </form>
       </Modal>

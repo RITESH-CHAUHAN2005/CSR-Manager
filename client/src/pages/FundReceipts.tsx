@@ -22,6 +22,7 @@ import {
   PrimaryButton,
   SearchInput,
   Select,
+  TextArea,
   TextInput,
 } from '../components/ui'
 
@@ -30,10 +31,11 @@ const emptyForm = {
   date: '',
   companyId: '',
   financialYearId: '',
-  reference: '',
-  mode: 'NEFT' as PaymentMode,
-  carryForward: 0,
   amount: 0,
+  carryForward: 0,
+  mode: 'NEFT' as PaymentMode,
+  reference: '',
+  notes: '',
 }
 
 export default function FundReceipts() {
@@ -62,7 +64,7 @@ export default function FundReceipts() {
         (!companyFilter || r.companyId === companyFilter) &&
         (!yearFilter || r.financialYearId === yearFilter) &&
         (!q ||
-          [r.reference, r.mode, companyName(r.companyId)].some((f) => f.toLowerCase().includes(q))),
+          [r.reference, r.mode, companyName(r.companyId)].some((f) => (f ?? '').toLowerCase().includes(q))),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receipts, companyFilter, yearFilter, search, companies])
@@ -107,7 +109,7 @@ export default function FundReceipts() {
   }
   function openEdit(r: FundReceipt) {
     setEditing(r)
-    setForm({ ...r })
+    setForm({ ...emptyForm, ...r })
     setFormError('')
     setOpen(true)
   }
@@ -171,15 +173,9 @@ export default function FundReceipts() {
         />
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Receipt' : 'Record Receipt'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Receipt' : 'Record Fund Receipt'}>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Date">
-              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
-            </Field>
-            <Field label="Reference">
-              <TextInput required value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
-            </Field>
             <Field label="Company">
               <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -190,22 +186,31 @@ export default function FundReceipts() {
                 {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
               </FormSelect>
             </Field>
-            <Field label="Mode">
+            <Field label="Amount (₹)">
+              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+            </Field>
+            <Field label="Carry Forward Amount (₹)">
+              <TextInput type="number" min={0} value={form.carryForward} onChange={(e) => setForm({ ...form, carryForward: Number(e.target.value) })} />
+            </Field>
+            <Field label="Receipt Date">
+              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
+            </Field>
+            <Field label="Payment Mode">
               <FormSelect value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as PaymentMode })}>
                 {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
               </FormSelect>
             </Field>
-            <Field label="Carry Forward (₹)">
-              <TextInput type="number" min={0} value={form.carryForward} onChange={(e) => setForm({ ...form, carryForward: Number(e.target.value) })} />
-            </Field>
           </div>
-          <Field label="Amount (₹)">
-            <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+          <Field label="Reference Number">
+            <TextInput placeholder="Transaction / cheque reference" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+          </Field>
+          <Field label="Notes">
+            <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">Cancel</button>
-            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record Receipt'}</button>
+            <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record'}</button>
           </div>
         </form>
       </Modal>
