@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   Card,
   ConfirmDialog,
+  DatePicker,
   Field,
   Modal,
   PageHeader,
@@ -34,6 +35,10 @@ export default function FinancialYears() {
     onSuccess: invalidate,
   })
   const deleteM = useMutation({ mutationFn: financialYearService.remove, onSuccess: invalidate })
+  const updateM = useMutation({
+    mutationFn: (v: { id: string; data: Partial<FinancialYear> }) => financialYearService.update(v.id, v.data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['financial-years'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }) },
+  })
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -71,9 +76,21 @@ export default function FinancialYears() {
               </div>
             </div>
             {canWrite && (
-              <button onClick={() => setDeleteId(fy.id)} className="text-danger hover:opacity-70">
-                <Trash2 size={18} />
-              </button>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-slate-500">{fy.isActive ? 'Active' : 'Inactive'}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={fy.isActive}
+                  onClick={() => updateM.mutate({ id: fy.id, data: { name: fy.name, startDate: fy.startDate, endDate: fy.endDate, isActive: !fy.isActive } })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fy.isActive ? 'bg-primary' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fy.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <button onClick={() => setDeleteId(fy.id)} className="text-danger hover:opacity-70">
+                  <Trash2 size={18} />
+                </button>
+              </div>
             )}
           </Card>
         ))}
@@ -91,10 +108,10 @@ export default function FinancialYears() {
           </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Start Date">
-              <TextInput type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+              <DatePicker required value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
             </Field>
             <Field label="End Date">
-              <TextInput type="date" required value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+              <DatePicker required value={form.endDate} onChange={(iso) => setForm({ ...form, endDate: iso })} />
             </Field>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-700">

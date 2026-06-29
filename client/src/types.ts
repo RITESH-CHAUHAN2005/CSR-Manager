@@ -68,6 +68,8 @@ export interface Company {
   contactPerson: string
   email: string
   phone: string
+  address?: string // registered address
+  notes?: string // free-form notes
 }
 
 export interface FinancialYear {

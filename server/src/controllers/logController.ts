@@ -21,3 +21,9 @@ export const myLogs = asyncHandler(async (req: Request, res: Response) => {
   const logs = await AuditLog.find({ userId: req.user!.id }).sort({ createdAt: -1 }).limit(300)
   res.json(logs)
 })
+
+// Admin: wipe the entire activity log.
+export const clearLogs = asyncHandler(async (_req: Request, res: Response) => {
+  const { deletedCount } = await AuditLog.deleteMany({})
+  res.json({ deleted: deletedCount ?? 0 })
+})

@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import {
   Card,
   ConfirmDialog,
+  DatePicker,
   Field,
   FormSelect,
   Modal,
@@ -167,7 +168,7 @@ export default function FundReceipts() {
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Date">
-              <TextInput type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
             </Field>
             <Field label="Reference">
               <TextInput required value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />

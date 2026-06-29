@@ -24,9 +24,9 @@ export async function seedDatabase() {
 
   // --- Companies ---
   const [hdfc, infosys, tcs] = await Company.create([
-    { name: 'HDFC Bank CSR Trust', cin: 'U65920MH1994PLC080618', contactPerson: 'Nandita Taneja', email: 'csrtrust@hdfc.com', phone: '+91-22-66521000' },
-    { name: 'Infosys Foundation', cin: 'U93090KA2013NPL068315', contactPerson: 'Sudha Murthy', email: 'foundation@infosys.com', phone: '+91-80-28520261' },
-    { name: 'Tata Consultancy Services Ltd', cin: 'U72200MH2004PLC153930', contactPerson: 'Rajesh Kumar', email: 'csr@tcs.com', phone: '+91-22-67789999' },
+    { name: 'HDFC Bank CSR Trust', cin: 'U65920MH1994PLC080618', contactPerson: 'Nandita Taneja', email: 'csrtrust@hdfc.com', phone: '+91-22-66521000', address: 'HDFC Bank House, Senapati Bapat Marg, Lower Parel, Mumbai - 400013', notes: 'Long-standing CSR partner; focus on environment and elderly-care programmes.' },
+    { name: 'Infosys Foundation', cin: 'U93090KA2013NPL068315', contactPerson: 'Sudha Murthy', email: 'foundation@infosys.com', phone: '+91-80-28520261', address: 'Infosys Foundation, Electronics City, Hosur Road, Bengaluru - 560100', notes: 'Supports education scholarships and rural healthcare initiatives.' },
+    { name: 'Tata Consultancy Services Ltd', cin: 'U72200MH2004PLC153930', contactPerson: 'Rajesh Kumar', email: 'csr@tcs.com', phone: '+91-22-67789999', address: 'TCS House, Raveline Street, Fort, Mumbai - 400001', notes: 'Primary donor for digital-literacy and skill-development programmes.' },
   ])
 
   // --- Users (passwords hashed with bcrypt, cost 12) ---
@@ -60,7 +60,7 @@ export async function seedDatabase() {
   // --- Fund Receipts (total ₹1,78,00,000) ---
   await FundReceipt.create([
     { date: '2022-04-15', companyId: tcs._id, financialYearId: fy1._id, reference: 'TCS/CSR/2022-23/001', mode: 'NEFT', carryForward: 0, amount: 2500000 },
-    { date: '2023-05-10', companyId: tcs._id, financialYearId: fy2._id, reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 280000, amount: 3500000 },
+    { date: '2023-05-10', companyId: tcs._id, financialYearId: fy2._id, reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 250000, amount: 3500000 },
     { date: '2023-07-01', companyId: infosys._id, financialYearId: fy2._id, reference: 'INF/2023-24/SCH/001', mode: 'NEFT', carryForward: 0, amount: 1800000 },
     { date: '2023-08-05', companyId: hdfc._id, financialYearId: fy2._id, reference: 'HDFC/CSR/2023-24/TP', mode: 'Cheque', carryForward: 0, amount: 800000 },
     { date: '2024-04-20', companyId: tcs._id, financialYearId: fy3._id, reference: 'TCS/CSR/2024-25/001', mode: 'RTGS', carryForward: 0, amount: 4000000 },

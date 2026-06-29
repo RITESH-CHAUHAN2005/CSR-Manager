@@ -41,6 +41,7 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('')
   const [shareNote, setShareNote] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [clearOpen, setClearOpen] = useState(false)
   const [form, setForm] = useState<NewUserInput>(emptyUser)
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
@@ -64,6 +65,14 @@ export default function AdminPanel() {
     mutationFn: userAdminService.remove,
     onSuccess: invalidateUsers,
     onError: (err) => setDeleteError(getErrorMessage(err, 'Could not delete user')),
+  })
+  const clearM = useMutation({
+    mutationFn: () => logService.clear(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logs'] })
+      setShareNote('Activity logs cleared ✓')
+      setTimeout(() => setShareNote(''), 2500)
+    },
   })
 
   const adminCount = users.filter((u) => u.role === 'admin').length
@@ -222,7 +231,17 @@ export default function AdminPanel() {
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold text-slate-800">Activity Logs</h2>
-          {shareNote && <span className="text-sm font-medium text-success">{shareNote}</span>}
+          <div className="flex items-center gap-3">
+            {shareNote && <span className="text-sm font-medium text-success">{shareNote}</span>}
+            {logs.length > 0 && (
+              <button
+                onClick={() => setClearOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-danger hover:bg-red-50"
+              >
+                <Trash2 size={15} /> Clear Logs
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -308,6 +327,14 @@ export default function AdminPanel() {
           if (deleteId) deleteM.mutate(deleteId)
           setDeleteId(null)
         }}
+      />
+
+      <ConfirmDialog
+        open={clearOpen}
+        title="Clear all activity logs?"
+        message="This permanently deletes every activity log entry. This cannot be undone."
+        onCancel={() => setClearOpen(false)}
+        onConfirm={() => { clearM.mutate(); setClearOpen(false) }}
       />
     </>
   )

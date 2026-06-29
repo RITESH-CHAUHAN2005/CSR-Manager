@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Mail, Phone, User } from '../components/icons'
 import { companyService, analyticsService } from '../services/dataService'
@@ -14,13 +15,23 @@ import {
   PageHeader,
   PrimaryButton,
   SearchInput,
+  TextArea,
   TextInput,
 } from '../components/ui'
 
-const empty: Omit<Company, 'id'> = { name: '', cin: '', contactPerson: '', email: '', phone: '' }
+const empty: Omit<Company, 'id'> = {
+  name: '',
+  cin: '',
+  contactPerson: '',
+  email: '',
+  phone: '',
+  address: '',
+  notes: '',
+}
 
 export default function Companies() {
   const { canWrite } = useAuth()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: companies = [] } = useQuery({ queryKey: ['companies'], queryFn: companyService.list })
   const { data: positions = [] } = useQuery({
@@ -31,7 +42,6 @@ export default function Companies() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Company | null>(null)
   const [form, setForm] = useState(empty)
-  const [details, setDetails] = useState<Company | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
   const [search, setSearch] = useState('')
@@ -40,7 +50,7 @@ export default function Companies() {
     const q = search.trim().toLowerCase()
     if (!q) return companies
     return companies.filter((c) =>
-      [c.name, c.cin, c.contactPerson, c.email].some((f) => f.toLowerCase().includes(q)),
+      [c.name, c.cin, c.contactPerson, c.email].some((f) => (f ?? '').toLowerCase().includes(q)),
     )
   }, [companies, search])
 
@@ -68,7 +78,15 @@ export default function Companies() {
   }
   function openEdit(c: Company) {
     setEditing(c)
-    setForm({ name: c.name, cin: c.cin, contactPerson: c.contactPerson, email: c.email, phone: c.phone })
+    setForm({
+      name: c.name,
+      cin: c.cin ?? '',
+      contactPerson: c.contactPerson ?? '',
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      address: c.address ?? '',
+      notes: c.notes ?? '',
+    })
     setFormError('')
     setFormOpen(true)
   }
@@ -102,19 +120,25 @@ export default function Companies() {
             <Card key={c.id} className="flex flex-col p-5">
               <div className="mb-3">
                 <h3 className="text-lg font-semibold text-slate-900">{c.name}</h3>
-                <p className="text-xs uppercase tracking-wide text-slate-400">{c.cin}</p>
+                {c.cin && <p className="text-xs uppercase tracking-wide text-slate-400">{c.cin}</p>}
               </div>
 
               <div className="space-y-1.5 text-sm text-slate-600">
-                <p className="flex items-center gap-2">
-                  <User size={14} className="text-slate-400" /> {c.contactPerson}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Mail size={14} className="text-slate-400" /> {c.email}
-                </p>
-                <p className="flex items-center gap-2">
-                  <Phone size={14} className="text-slate-400" /> {c.phone}
-                </p>
+                {c.contactPerson && (
+                  <p className="flex items-center gap-2">
+                    <User size={14} className="text-slate-400" /> {c.contactPerson}
+                  </p>
+                )}
+                {c.email && (
+                  <p className="flex items-center gap-2">
+                    <Mail size={14} className="text-slate-400" /> {c.email}
+                  </p>
+                )}
+                {c.phone && (
+                  <p className="flex items-center gap-2">
+                    <Phone size={14} className="text-slate-400" /> {c.phone}
+                  </p>
+                )}
               </div>
 
               <div className="my-4 grid grid-cols-2 gap-y-3 border-t border-slate-100 pt-4 text-sm">
@@ -129,7 +153,7 @@ export default function Companies() {
               </div>
 
               <button
-                onClick={() => setDetails(c)}
+                onClick={() => navigate(`/companies/${c.id}`)}
                 className="mt-auto flex items-center justify-between rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
               >
                 View Details <ChevronRight size={16} />
@@ -154,22 +178,66 @@ export default function Companies() {
       </div>
 
       {/* Add / Edit form */}
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Company' : 'Add Company'}>
+      <Modal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={editing ? 'Edit Donor Company' : 'Add Donor Company'}
+      >
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Company Name">
-            <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Field label="Company Name *">
+            <TextInput
+              required
+              placeholder="Full legal name of company"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </Field>
-          <Field label="CIN / Registration No.">
-            <TextInput required value={form.cin} onChange={(e) => setForm({ ...form, cin: e.target.value })} />
+          <Field label="Registration / CIN Number">
+            <TextInput
+              placeholder="e.g. U72200MH2004PLC153930"
+              value={form.cin}
+              onChange={(e) => setForm({ ...form, cin: e.target.value })}
+            />
           </Field>
-          <Field label="Contact Person">
-            <TextInput required value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Contact Person">
+              <TextInput
+                placeholder="Name"
+                value={form.contactPerson}
+                onChange={(e) => setForm({ ...form, contactPerson: e.target.value })}
+              />
+            </Field>
+            <Field label="Phone">
+              <TextInput
+                placeholder="+91-"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </Field>
+          </div>
           <Field label="Email">
-            <TextInput type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <TextInput
+              type="email"
+              placeholder="csr@company.com"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
           </Field>
-          <Field label="Phone">
-            <TextInput required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <Field label="Address">
+            <TextArea
+              rows={2}
+              placeholder="Registered address"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+            />
+          </Field>
+          <Field label="Notes">
+            <TextArea
+              rows={2}
+              placeholder="Any additional notes"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </Field>
           {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
@@ -181,25 +249,6 @@ export default function Companies() {
             </button>
           </div>
         </form>
-      </Modal>
-
-      {/* Details */}
-      <Modal open={!!details} onClose={() => setDetails(null)} title={details?.name ?? ''}>
-        {details && (
-          <div className="space-y-3 text-sm">
-            <DetailRow label="CIN" value={details.cin} />
-            <DetailRow label="Contact Person" value={details.contactPerson} />
-            <DetailRow label="Email" value={details.email} />
-            <DetailRow label="Phone" value={details.phone} />
-            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3">
-              <DetailRow label="Total Received" value={formatINR(posById[details.id]?.totalReceived ?? 0)} />
-              <DetailRow label="Carry Forward" value={formatINR(posById[details.id]?.carryForward ?? 0)} />
-              <DetailRow label="Expenditure" value={formatINR(posById[details.id]?.expenditure ?? 0)} />
-              <DetailRow label="Balance" value={formatINR(posById[details.id]?.balance ?? 0)} />
-              <DetailRow label="Projects" value={String(posById[details.id]?.projects ?? 0)} />
-            </div>
-          </div>
-        )}
       </Modal>
 
       <ConfirmDialog
@@ -221,15 +270,6 @@ function Stat({ label, value, valueClass = 'text-slate-900' }: { label: string; 
     <div>
       <p className="text-xs text-slate-400">{label}</p>
       <p className={`font-semibold ${valueClass}`}>{value}</p>
-    </div>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="font-medium text-slate-800">{value}</p>
     </div>
   )
 }

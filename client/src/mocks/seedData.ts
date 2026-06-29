@@ -20,6 +20,8 @@ export const companies: Company[] = [
     contactPerson: 'Nandita Taneja',
     email: 'csrtrust@hdfc.com',
     phone: '+91-22-66521000',
+    address: 'HDFC Bank House, Senapati Bapat Marg, Lower Parel, Mumbai - 400013',
+    notes: 'Long-standing CSR partner; focus on environment and elderly-care programmes.',
   },
   {
     id: 'c2',
@@ -28,6 +30,8 @@ export const companies: Company[] = [
     contactPerson: 'Sudha Murthy',
     email: 'foundation@infosys.com',
     phone: '+91-80-28520261',
+    address: 'Infosys Foundation, Electronics City, Hosur Road, Bengaluru - 560100',
+    notes: 'Supports education scholarships and rural healthcare initiatives.',
   },
   {
     id: 'c3',
@@ -36,6 +40,8 @@ export const companies: Company[] = [
     contactPerson: 'Rajesh Kumar',
     email: 'csr@tcs.com',
     phone: '+91-22-67789999',
+    address: 'TCS House, Raveline Street, Fort, Mumbai - 400001',
+    notes: 'Primary donor for digital-literacy and skill-development programmes.',
   },
 ]
 
@@ -127,7 +133,7 @@ export const projects: Project[] = [
 
 export const fundReceipts: FundReceipt[] = [
   { id: 'r1', date: '2022-04-15', companyId: 'c3', financialYearId: 'fy1', reference: 'TCS/CSR/2022-23/001', mode: 'NEFT', carryForward: 0, amount: 2500000 },
-  { id: 'r2', date: '2023-05-10', companyId: 'c3', financialYearId: 'fy2', reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 280000, amount: 3500000 },
+  { id: 'r2', date: '2023-05-10', companyId: 'c3', financialYearId: 'fy2', reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 250000, amount: 3500000 },
   { id: 'r3', date: '2023-07-01', companyId: 'c2', financialYearId: 'fy2', reference: 'INF/2023-24/SCH/001', mode: 'NEFT', carryForward: 0, amount: 1800000 },
   { id: 'r4', date: '2023-08-05', companyId: 'c1', financialYearId: 'fy2', reference: 'HDFC/CSR/2023-24/TP', mode: 'Cheque', carryForward: 0, amount: 800000 },
   { id: 'r5', date: '2024-04-20', companyId: 'c3', financialYearId: 'fy3', reference: 'TCS/CSR/2024-25/001', mode: 'RTGS', carryForward: 0, amount: 4000000 },

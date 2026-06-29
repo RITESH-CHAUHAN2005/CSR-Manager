@@ -1,4 +1,7 @@
-import { type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useEffect, useRef, type ReactNode, type SelectHTMLAttributes } from 'react'
+import flatpickr from 'flatpickr'
+import type { Instance } from 'flatpickr/dist/types/instance'
+import 'flatpickr/dist/flatpickr.min.css'
 import { ChevronDown, Plus, Search, X } from './icons'
 
 // ---------------- PageHeader ----------------
@@ -160,6 +163,57 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={inputClass} />
+}
+
+// ---------------- DatePicker (flatpickr) ----------------
+// Calendar-backed date field used everywhere a date is entered. Stores/emits an ISO
+// `YYYY-MM-DD` string (what the backend validators expect) while showing a friendly
+// "15 Apr 2024" format to the user via flatpickr's altInput.
+export function DatePicker({
+  value,
+  onChange,
+  required,
+  placeholder = 'Select date',
+}: {
+  value: string
+  onChange: (iso: string) => void
+  required?: boolean
+  placeholder?: string
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  const fpRef = useRef<Instance | null>(null)
+  // Keep the latest onChange without re-initialising flatpickr on every render.
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
+  useEffect(() => {
+    if (!ref.current) return
+    const fp = flatpickr(ref.current, {
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd M Y',
+      allowInput: true,
+      defaultDate: value || undefined,
+      onChange: (_dates, iso) => onChangeRef.current(iso),
+    }) as Instance
+    // Mirror the `required` flag onto the visible (alt) input so native form
+    // validation works without a hidden required input breaking focus.
+    if (required && fp.altInput) fp.altInput.required = true
+    if (fp.altInput) fp.altInput.placeholder = placeholder
+    fpRef.current = fp
+    return () => fp.destroy()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync external value changes (e.g. when an edit modal populates the form).
+  useEffect(() => {
+    const fp = fpRef.current
+    if (!fp) return
+    if (value && value !== fp.input.value) fp.setDate(value, false)
+    else if (!value && fp.input.value) fp.clear(false)
+  }, [value])
+
+  return <input ref={ref} type="text" className={inputClass} />
 }
 
 export function FormSelect({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {

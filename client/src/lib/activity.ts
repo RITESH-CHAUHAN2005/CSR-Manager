@@ -27,6 +27,8 @@ const FIELD_LABELS: Record<string, string> = {
   contactPerson: 'Contact Person',
   email: 'Email',
   phone: 'Phone',
+  address: 'Address',
+  notes: 'Notes',
   startDate: 'Start Date',
   endDate: 'End Date',
   isActive: 'Active',

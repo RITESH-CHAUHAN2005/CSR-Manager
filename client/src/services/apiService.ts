@@ -53,4 +53,5 @@ export const logService = {
   list: (params?: { userEmail?: string; action?: string; entity?: string }) =>
     api.get<AuditLogEntry[]>('/logs', { params }).then((r) => r.data),
   mine: () => api.get<AuditLogEntry[]>('/logs/mine').then((r) => r.data),
+  clear: () => api.delete<{ deleted: number }>('/logs').then((r) => r.data),
 }

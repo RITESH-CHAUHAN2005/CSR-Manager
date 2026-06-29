@@ -11,6 +11,7 @@ import AppLayout from './components/AppLayout'
 const Login = lazy(() => import('./pages/Login'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Companies = lazy(() => import('./pages/Companies'))
+const CompanyDetail = lazy(() => import('./pages/CompanyDetail'))
 const FinancialYears = lazy(() => import('./pages/FinancialYears'))
 const Projects = lazy(() => import('./pages/Projects'))
 const FundReceipts = lazy(() => import('./pages/FundReceipts'))
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         {/* Data pages — every role (write actions are gated inside each page) */}
         <Route path="/companies" element={<Companies />} />
+        <Route path="/companies/:id" element={<CompanyDetail />} />
         <Route path="/financial-years" element={<FinancialYears />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/fund-receipts" element={<FundReceipts />} />

@@ -17,6 +17,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Flatpickr calendar — themed to the brand teal palette */
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+  background: rgb(var(--color-primary));
+  border-color: rgb(var(--color-primary));
+}
+.flatpickr-day.today {
+  border-color: rgb(var(--color-primary-light));
+}
+.flatpickr-day:hover {
+  background: rgb(var(--color-canvas));
+}
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month .flatpickr-monthDropdown-months,
+.flatpickr-weekday {
+  color: rgb(var(--color-primary-dark));
+  fill: rgb(var(--color-primary-dark));
+}
+
 /* Thin, subtle scrollbars to match the clean dashboard look */
 ::-webkit-scrollbar {
   width: 10px;

@@ -24,12 +24,16 @@ export const createUserSchema = z.object({
   companyId: objectId.optional(),
 })
 
+// Only the company name is required. Remaining donor-profile fields are optional
+// (email, when supplied, must still be a valid address).
 export const companySchema = z.object({
   name: z.string().min(1).max(200),
-  cin: z.string().min(1).max(50),
-  contactPerson: z.string().min(1).max(120),
-  email: z.string().email(),
-  phone: z.string().min(1).max(40),
+  cin: z.string().max(50).optional().default(''),
+  contactPerson: z.string().max(120).optional().default(''),
+  email: z.union([z.string().email(), z.literal('')]).optional().default(''),
+  phone: z.string().max(40).optional().default(''),
+  address: z.string().max(400).optional().default(''),
+  notes: z.string().max(2000).optional().default(''),
 })
 
 export const financialYearSchema = z.object({

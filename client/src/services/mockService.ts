@@ -253,4 +253,5 @@ export const userAdminService = {
 export const logService = {
   list: (_params?: { userEmail?: string; action?: string; entity?: string }): Promise<AuditLogEntry[]> => delay([]),
   mine: (): Promise<AuditLogEntry[]> => delay([]),
+  clear: (): Promise<{ deleted: number }> => delay({ deleted: 0 }),
 }

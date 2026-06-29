@@ -7,15 +7,20 @@ export interface ICompany extends Document {
   contactPerson: string
   email: string
   phone: string
+  address: string
+  notes: string
 }
 
 const companySchema = new Schema<ICompany>(
   {
     name: { type: String, required: true, trim: true },
-    cin: { type: String, required: true, trim: true },
-    contactPerson: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, trim: true },
+    // Only the company name is mandatory; the rest of the donor profile is optional.
+    cin: { type: String, default: '', trim: true },
+    contactPerson: { type: String, default: '', trim: true },
+    email: { type: String, default: '', lowercase: true, trim: true },
+    phone: { type: String, default: '', trim: true },
+    address: { type: String, default: '', trim: true },
+    notes: { type: String, default: '', trim: true },
   },
   { timestamps: true, toJSON: baseToJSON },
 )

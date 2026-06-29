@@ -11,6 +11,8 @@ export {
   SignOut as LogOut,
   CaretDown as ChevronDown,
   CaretRight as ChevronRight,
+  ArrowLeft,
+  MapPin,
   Plus,
   X,
   Check,
