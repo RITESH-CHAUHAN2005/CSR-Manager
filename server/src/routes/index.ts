@@ -4,6 +4,7 @@ import analyticsRoutes from './analyticsRoutes.js'
 import userRoutes from './userRoutes.js'
 import logRoutes from './logRoutes.js'
 import { entityRouter } from './entityRouter.js'
+import { blockActiveProjectDelete } from '../middleware/guardProjectDelete.js'
 import { Company } from '../models/Company.js'
 import { FinancialYear } from '../models/FinancialYear.js'
 import { Project } from '../models/Project.js'
@@ -28,7 +29,11 @@ api.use('/logs', logRoutes)
 // All data resources: read = any role; create/update/delete = admin + editor.
 api.use('/companies', entityRouter(Company, companySchema, 'company'))
 api.use('/financial-years', entityRouter(FinancialYear, financialYearSchema, 'financialYear'))
-api.use('/projects', entityRouter(Project, projectSchema, 'project'))
+// Active projects are protected from deletion (mark completed first) — see guard.
+api.use(
+  '/projects',
+  entityRouter(Project, projectSchema, 'project', { deleteGuards: [blockActiveProjectDelete] }),
+)
 api.use('/fund-receipts', entityRouter(FundReceipt, fundReceiptSchema, 'fundReceipt'))
 api.use('/expenditures', entityRouter(Expenditure, expenditureSchema, 'expenditure'))
 

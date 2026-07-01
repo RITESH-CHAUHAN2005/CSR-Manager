@@ -57,6 +57,7 @@ export default function Projects() {
   const [form, setForm] = useState(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? '—'
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
@@ -88,7 +89,11 @@ export default function Projects() {
     mutationFn: (v: { id: string; data: Partial<Project> }) => projectService.update(v.id, v.data),
     onSuccess: invalidate,
   })
-  const deleteM = useMutation({ mutationFn: projectService.remove, onSuccess: invalidate })
+  const deleteM = useMutation({
+    mutationFn: projectService.remove,
+    onSuccess: invalidate,
+    onError: (err) => setDeleteError(getErrorMessage(err, 'Could not delete project')),
+  })
 
   // Only active financial years can be chosen when adding. When editing, keep the
   // record's own (possibly inactive) year as an option so existing data stays intact.
@@ -136,6 +141,10 @@ export default function Projects() {
         action={canCreate && <PrimaryButton onClick={openAdd}>Add Project</PrimaryButton>}
       />
 
+      {deleteError && (
+        <p className="mb-4 rounded-xl bg-danger/10 px-4 py-2.5 text-sm text-danger">{deleteError}</p>
+      )}
+
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
           <option value="">All Companies</option>
@@ -182,12 +191,27 @@ export default function Projects() {
             </div>
             {canWrite && (
               <div className="flex shrink-0 gap-3">
-                <button onClick={() => openEdit(p)} className="text-muted hover:text-primary">
+                <button onClick={() => openEdit(p)} className="text-muted hover:text-primary" title="Edit project">
                   <Pencil size={16} />
                 </button>
-                <button onClick={() => setDeleteId(p.id)} className="text-muted hover:text-danger">
-                  <Trash2 size={16} />
-                </button>
+                {p.status === 'active' ? (
+                  // Active projects are protected — enforced on the backend too.
+                  <button
+                    disabled
+                    title="Active projects can't be deleted. Mark it Completed first."
+                    className="cursor-not-allowed text-muted/40"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setDeleteError(''); setDeleteId(p.id) }}
+                    className="text-muted hover:text-danger"
+                    title="Delete project"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             )}
           </div>

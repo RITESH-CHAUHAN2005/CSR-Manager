@@ -97,6 +97,13 @@ export const projectService = {
     return delay(projects.find((p) => p.id === id)!)
   },
   remove: (id: string) => {
+    // Mirror the backend rule: an active project cannot be deleted.
+    const target = projects.find((p) => p.id === id)
+    if (target?.status === 'active') {
+      return Promise.reject(
+        new Error('This project is Active and cannot be deleted. Mark it as Completed first, then delete it.'),
+      )
+    }
     projects = projects.filter((p) => p.id !== id)
     return delay({ id })
   },

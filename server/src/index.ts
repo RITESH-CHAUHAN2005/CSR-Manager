@@ -3,12 +3,15 @@ import mongoose from 'mongoose'
 import { createApp } from './app.js'
 import { connectDB } from './config/db.js'
 import { env } from './config/env.js'
+import { startKeepAlive } from './utils/keepAlive.js'
 
 async function bootstrap() {
   await connectDB()
   const app = createApp()
   const server = app.listen(env.PORT, () => {
     console.log(`🚀 CSR Manager API running on http://localhost:${env.PORT}`)
+    // Keep the free-tier instance warm so there's no cold-start delay in prod.
+    startKeepAlive()
   })
 
   // Surface listen errors clearly instead of an unhandled 'error' crash.
