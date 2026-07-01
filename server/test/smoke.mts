@@ -73,8 +73,9 @@ async function run() {
   r = await fetch(`${BASE}/reports/year-wise`, { headers: { cookie: adminCookie } })
   const yr = await r.json()
   const fy2324 = yr.find((x: { yearName: string }) => x.yearName === 'FY 2023-24')
-  check('FY2023-24 carryForwardIn = 2,80,000', fy2324?.carryForwardIn === 280000, `got ${fy2324?.carryForwardIn}`)
-  check('FY2023-24 balance = 8,10,000', fy2324?.balance === 810000, `got ${fy2324?.balance}`)
+  // Matches seed.ts: FY2023-24 receipt carry-forward = 2,50,000.
+  check('FY2023-24 carryForwardIn = 2,50,000', fy2324?.carryForwardIn === 250000, `got ${fy2324?.carryForwardIn}`)
+  check('FY2023-24 balance = 7,80,000', fy2324?.balance === 780000, `got ${fy2324?.balance}`)
 
   // 7. Viewer RBAC (read-only). Seed has only the admin, so the admin creates a
   // viewer first (no self-registration), then we log in as that viewer.
@@ -147,6 +148,34 @@ async function run() {
   // 13. With two admins present, deleting the OTHER admin is allowed.
   r = await fetch(`${BASE}/users/${admin2.id}`, { method: 'DELETE', headers: { cookie: adminCookie } })
   check('admin can delete another admin -> 200', r.status === 200, `got ${r.status}`)
+
+  // 14. Active projects are protected — cannot be deleted until marked Completed.
+  r = await fetch(`${BASE}/companies`, { headers: { cookie: adminCookie } })
+  const companies = await r.json()
+  r = await fetch(`${BASE}/financial-years`, { headers: { cookie: adminCookie } })
+  const years = await r.json()
+  const activeYear = years.find((y: { isActive: boolean }) => y.isActive) ?? years[0]
+  r = await fetch(`${BASE}/projects`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({
+      name: 'Delete-Guard Test', companyId: companies[0].id,
+      financialYearId: activeYear.id, status: 'active', budget: 1000,
+    }),
+  })
+  const proj = await r.json()
+  check('admin creates active project -> 201', r.status === 201 && proj.status === 'active', `got ${r.status}`)
+
+  r = await fetch(`${BASE}/projects/${proj.id}`, { method: 'DELETE', headers: { cookie: adminCookie } })
+  check('deleting ACTIVE project blocked -> 409', r.status === 409, `got ${r.status}`)
+
+  r = await fetch(`${BASE}/projects/${proj.id}`, {
+    method: 'PUT', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ ...proj, status: 'completed' }),
+  })
+  check('mark project Completed -> 200', r.status === 200, `got ${r.status}`)
+
+  r = await fetch(`${BASE}/projects/${proj.id}`, { method: 'DELETE', headers: { cookie: adminCookie } })
+  check('deleting COMPLETED project allowed -> 200', r.status === 200, `got ${r.status}`)
 }
 
 try {
