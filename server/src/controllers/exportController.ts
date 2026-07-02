@@ -9,8 +9,17 @@ import { FundReceipt } from '../models/FundReceipt.js'
 import { Expenditure } from '../models/Expenditure.js'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
+// PDF money format. We deliberately use the "Rs" prefix instead of the ₹ glyph:
+// PDFKit's built-in Helvetica has no rupee glyph, so ₹ renders as a stray mark in
+// the PDF. "Rs" is unambiguous, always renders, and keeps every report clean.
 const inr = (n: number) =>
-  '₹' + new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2 }).format(n)
+  'Rs ' + new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2 }).format(n)
+
+// Human-friendly project status labels for reports.
+const prettyStatus = (s: string): string =>
+  (({ active: 'Active', completed: 'Completed', on_hold: 'On Hold', cancelled: 'Cancelled' }) as Record<string, string>)[
+    s
+  ] ?? s
 
 type ColKind = 'text' | 'money' | 'number' | 'percent'
 interface Column {
@@ -106,7 +115,7 @@ async function projectReport(): Promise<ReportSpec> {
     const company = companies.find((c) => String(c._id) === String(p.companyId))?.name ?? '—'
     const year = years.find((y) => String(y._id) === String(p.financialYearId))?.name ?? '—'
     const utilization = p.budget ? Math.round((spent / p.budget) * 100) : 0
-    return [p.name, company, year, p.budget, spent, utilization, p.status]
+    return [p.name, company, year, p.budget, spent, utilization, prettyStatus(p.status)]
   })
   return {
     title: 'Project-wise Financial Report',
