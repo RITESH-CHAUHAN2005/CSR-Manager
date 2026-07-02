@@ -7,7 +7,11 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
   const cookieToken = req.cookies?.[AUTH_COOKIE]
   const header = req.headers.authorization
   const bearer = header?.startsWith('Bearer ') ? header.slice(7) : undefined
-  const token = cookieToken || bearer
+  // Query-string token fallback: lets the mobile app open a file-download URL
+  // (e.g. the PDF/Excel report export) directly in the device browser, which
+  // cannot attach an Authorization header. Used for GET downloads only.
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined
+  const token = cookieToken || bearer || queryToken
 
   if (!token) throw new ApiError(401, 'Authentication required')
 
