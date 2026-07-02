@@ -8,7 +8,8 @@ export interface IProject extends Document {
   category: string
   location: string
   budget: number
-  status: 'active' | 'completed'
+  status: 'active' | 'completed' | 'on_hold' | 'cancelled'
+  ongoing: boolean
   description: string
   startDate?: string
   endDate?: string
@@ -23,7 +24,13 @@ const projectSchema = new Schema<IProject>(
     category: { type: String, default: '', trim: true },
     location: { type: String, default: '', trim: true },
     budget: { type: Number, default: 0, min: 0 },
-    status: { type: String, enum: ['active', 'completed'], default: 'active' },
+    status: {
+      type: String,
+      enum: ['active', 'completed', 'on_hold', 'cancelled'],
+      default: 'active',
+    },
+    // Marks a project that is still running with no fixed end date.
+    ongoing: { type: Boolean, default: false },
     description: { type: String, default: '', trim: true },
     startDate: { type: String, default: '' },
     endDate: { type: String, default: '' },

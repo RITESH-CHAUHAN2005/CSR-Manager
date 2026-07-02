@@ -43,19 +43,34 @@ export const financialYearSchema = z.object({
   isActive: z.boolean().optional().default(false),
 })
 
-export const projectSchema = z.object({
-  name: z.string().min(1).max(200),
-  companyId: objectId,
-  financialYearId: objectId,
-  category: z.string().max(80).optional().default(''),
-  location: z.string().max(160).optional().default(''),
-  budget: money.optional().default(0),
-  status: z.enum(['active', 'completed']).default('active'),
-  description: z.string().max(2000).optional().default(''),
-  startDate: z.string().max(20).optional().default(''),
-  endDate: z.string().max(20).optional().default(''),
-  notes: z.string().max(2000).optional().default(''),
-})
+export const projectSchema = z
+  .object({
+    name: z.string().min(1).max(200),
+    companyId: objectId,
+    financialYearId: objectId,
+    category: z.string().max(80).optional().default(''),
+    location: z.string().max(160).optional().default(''),
+    budget: money.optional().default(0),
+    status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).default('active'),
+    ongoing: z.coerce.boolean().optional().default(false),
+    description: z.string().max(2000).optional().default(''),
+    // Start date is mandatory; end date stays optional (blank when a project is ongoing).
+    startDate: z.string().min(1, 'Start date is required').max(20),
+    endDate: z.string().max(20).optional().default(''),
+    notes: z.string().max(2000).optional().default(''),
+  })
+  // For clarity, an On Hold or Cancelled project must carry a reason in either the
+  // description or the notes so reviewers know why it was paused/stopped.
+  .refine(
+    (d) =>
+      !['on_hold', 'cancelled'].includes(d.status) ||
+      Boolean(d.description?.trim()) ||
+      Boolean(d.notes?.trim()),
+    {
+      message: 'Add a description or notes explaining why the project is On Hold or Cancelled.',
+      path: ['description'],
+    },
+  )
 
 export const fundReceiptSchema = z.object({
   date: isoDate,
