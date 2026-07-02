@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Trash2 } from '../components/icons'
+import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
 import {
   companyService,
@@ -16,6 +16,7 @@ import {
   Card,
   ConfirmDialog,
   DatePicker,
+  DetailModal,
   Field,
   FormSelect,
   Modal,
@@ -53,6 +54,7 @@ export default function Expenditures() {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Expenditure | null>(null)
+  const [viewing, setViewing] = useState<Expenditure | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -185,13 +187,17 @@ export default function Expenditures() {
           ]}
           slots={{
             6: (_v, row) => <span className="font-semibold text-danger">{formatINR((row as Expenditure).amount)}</span>,
-            7: (_v, row) =>
-              canWrite ? (
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => openEdit(row as Expenditure)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
-                  <button onClick={() => setDeleteId((row as Expenditure).id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
-                </div>
-              ) : null,
+            7: (_v, row) => (
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setViewing(row as Expenditure)} className="text-muted hover:text-primary" title="View details, description & notes"><Eye size={16} /></button>
+                {canWrite && (
+                  <>
+                    <button onClick={() => openEdit(row as Expenditure)} className="text-muted hover:text-primary" title="Edit"><Pencil size={16} /></button>
+                    <button onClick={() => setDeleteId((row as Expenditure).id)} className="text-muted hover:text-danger" title="Delete"><Trash2 size={16} /></button>
+                  </>
+                )}
+              </div>
+            ),
           }}
           options={{ searching: false, order: [[0, 'desc']] }}
         />
@@ -244,6 +250,35 @@ export default function Expenditures() {
           </div>
         </form>
       </Modal>
+
+      <DetailModal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing ? `Expenditure — ${projectName(viewing.projectId)}` : 'Expenditure'}
+        rows={
+          viewing
+            ? [
+                { label: 'Date', value: viewing.date ? formatDate(viewing.date) : '' },
+                { label: 'Financial Year', value: yearName(viewing.financialYearId) },
+                { label: 'Project', value: projectName(viewing.projectId) },
+                { label: 'Company', value: companyName(viewing.companyId) },
+                { label: 'Category', value: viewing.category },
+                { label: 'Approved By', value: viewing.approvedBy },
+                { label: 'Amount', value: <span className="font-semibold text-danger">{formatINR(viewing.amount)}</span> },
+                { label: 'Reference', value: viewing.reference },
+                { label: 'Recorded By', value: viewing.createdByName || viewing.createdByEmail },
+              ]
+            : []
+        }
+        sections={
+          viewing
+            ? [
+                { label: 'Description', value: viewing.description },
+                { label: 'Notes', value: viewing.notes },
+              ]
+            : []
+        }
+      />
 
       <ConfirmDialog
         open={!!deleteId}

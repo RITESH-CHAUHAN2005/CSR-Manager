@@ -80,7 +80,7 @@ export interface FinancialYear {
   isActive: boolean
 }
 
-export type ProjectStatus = 'active' | 'completed'
+export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
 
 export interface Project extends CreatedBy {
   id: string
@@ -91,6 +91,7 @@ export interface Project extends CreatedBy {
   location: string
   budget: number
   status: ProjectStatus
+  ongoing?: boolean // still running, no fixed end date
   description: string
   startDate?: string
   endDate?: string

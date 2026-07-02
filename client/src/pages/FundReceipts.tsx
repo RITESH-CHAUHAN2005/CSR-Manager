@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Trash2 } from '../components/icons'
+import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
 import {
   companyService,
@@ -15,6 +15,7 @@ import {
   Card,
   ConfirmDialog,
   DatePicker,
+  DetailModal,
   Field,
   FormSelect,
   Modal,
@@ -50,6 +51,7 @@ export default function FundReceipts() {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FundReceipt | null>(null)
+  const [viewing, setViewing] = useState<FundReceipt | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -161,13 +163,17 @@ export default function FundReceipts() {
           ]}
           slots={{
             6: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
-            7: (_v, row) =>
-              canWrite ? (
-                <div className="flex justify-end gap-3">
-                  <button onClick={() => openEdit(row as FundReceipt)} className="text-muted hover:text-primary"><Pencil size={16} /></button>
-                  <button onClick={() => setDeleteId((row as FundReceipt).id)} className="text-muted hover:text-danger"><Trash2 size={16} /></button>
-                </div>
-              ) : null,
+            7: (_v, row) => (
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setViewing(row as FundReceipt)} className="text-muted hover:text-primary" title="View details & notes"><Eye size={16} /></button>
+                {canWrite && (
+                  <>
+                    <button onClick={() => openEdit(row as FundReceipt)} className="text-muted hover:text-primary" title="Edit"><Pencil size={16} /></button>
+                    <button onClick={() => setDeleteId((row as FundReceipt).id)} className="text-muted hover:text-danger" title="Delete"><Trash2 size={16} /></button>
+                  </>
+                )}
+              </div>
+            ),
           }}
           options={{ searching: false, order: [[0, 'desc']] }}
         />
@@ -214,6 +220,27 @@ export default function FundReceipts() {
           </div>
         </form>
       </Modal>
+
+      <DetailModal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing ? `Receipt — ${companyName(viewing.companyId)}` : 'Fund Receipt'}
+        rows={
+          viewing
+            ? [
+                { label: 'Date', value: viewing.date ? formatDate(viewing.date) : '' },
+                { label: 'Financial Year', value: yearName(viewing.financialYearId) },
+                { label: 'Company', value: companyName(viewing.companyId) },
+                { label: 'Reference', value: viewing.reference },
+                { label: 'Payment Mode', value: viewing.mode },
+                { label: 'Carry Forward', value: formatINR(viewing.carryForward) },
+                { label: 'Amount', value: <span className="font-semibold text-success">{formatINR(viewing.amount)}</span> },
+                { label: 'Recorded By', value: viewing.createdByName || viewing.createdByEmail },
+              ]
+            : []
+        }
+        sections={viewing ? [{ label: 'Notes', value: viewing.notes }] : []}
+      />
 
       <ConfirmDialog
         open={!!deleteId}

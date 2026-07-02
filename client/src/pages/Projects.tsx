@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Trash2 } from '../components/icons'
+import { Eye, Pencil, Trash2 } from '../components/icons'
 import {
   companyService,
   financialYearService,
@@ -11,8 +11,10 @@ import { formatDate, formatINR } from '../lib/currency'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
+  Checkbox,
   ConfirmDialog,
   DatePicker,
+  DetailModal,
   Field,
   FormSelect,
   Modal,
@@ -25,11 +27,21 @@ import {
   TextInput,
 } from '../components/ui'
 
+const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
+  { value: 'active', label: 'Active' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+// On Hold / Cancelled projects must carry a reason (description or notes) for clarity.
+const REASON_REQUIRED: ProjectStatus[] = ['on_hold', 'cancelled']
+
 const emptyForm = {
   name: '',
   companyId: '',
   financialYearId: '',
   status: 'active' as ProjectStatus,
+  ongoing: false,
   budget: 0,
   category: '',
   location: '',
@@ -54,6 +66,7 @@ export default function Projects() {
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
+  const [viewing, setViewing] = useState<Project | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
@@ -121,7 +134,20 @@ export default function Projects() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
-    const payload = { ...form, budget: Number(form.budget) }
+    if (!form.startDate) {
+      setFormError('Start date is required.')
+      return
+    }
+    if (REASON_REQUIRED.includes(form.status) && !form.description.trim() && !form.notes.trim()) {
+      setFormError('Add a description or notes explaining why the project is On Hold or Cancelled.')
+      return
+    }
+    // An ongoing project has no fixed end date — clear it so the two never conflict.
+    const payload = {
+      ...form,
+      budget: Number(form.budget),
+      endDate: form.ongoing ? '' : form.endDate,
+    }
     try {
       if (editing) await updateM.mutateAsync({ id: editing.id, data: payload })
       else await createM.mutateAsync(payload)
@@ -131,8 +157,11 @@ export default function Projects() {
     }
   }
 
-  const period = (p: Project) =>
-    [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
+  const period = (p: Project) => {
+    const start = p.startDate ? formatDate(String(p.startDate)) : ''
+    if (p.ongoing) return start ? `${start} – Ongoing` : 'Ongoing'
+    return [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
+  }
 
   return (
     <>
@@ -182,38 +211,47 @@ export default function Projects() {
                 {p.category && <span>Category: <span className="text-ink/80">{p.category}</span></span>}
                 {p.location && <span>Location: <span className="text-ink/80">{p.location}</span></span>}
                 <span>Budget: <span className="text-ink/80">{formatINR(p.budget)}</span></span>
-                {(p.startDate || p.endDate) && (
+                {(p.startDate || p.endDate || p.ongoing) && (
                   <span>Period: <span className="text-ink/80">{period(p)}</span></span>
                 )}
               </div>
-              {p.description && <p className="mt-1 text-sm text-primary">{p.description}</p>}
-              {p.notes && <p className="mt-1 text-sm text-muted">{p.notes}</p>}
+              {p.description && <p className="mt-1 line-clamp-2 text-sm text-primary">{p.description}</p>}
+              {p.notes && <p className="mt-1 line-clamp-2 text-sm text-muted">{p.notes}</p>}
             </div>
-            {canWrite && (
-              <div className="flex shrink-0 gap-3">
-                <button onClick={() => openEdit(p)} className="text-muted hover:text-primary" title="Edit project">
-                  <Pencil size={16} />
-                </button>
-                {p.status === 'active' ? (
-                  // Active projects are protected — enforced on the backend too.
-                  <button
-                    disabled
-                    title="Active projects can't be deleted. Mark it Completed first."
-                    className="cursor-not-allowed text-muted/40"
-                  >
-                    <Trash2 size={16} />
+            <div className="flex shrink-0 gap-3">
+              <button
+                onClick={() => setViewing(p)}
+                className="text-muted hover:text-primary"
+                title="View details, description & notes"
+              >
+                <Eye size={16} />
+              </button>
+              {canWrite && (
+                <>
+                  <button onClick={() => openEdit(p)} className="text-muted hover:text-primary" title="Edit project">
+                    <Pencil size={16} />
                   </button>
-                ) : (
-                  <button
-                    onClick={() => { setDeleteError(''); setDeleteId(p.id) }}
-                    className="text-muted hover:text-danger"
-                    title="Delete project"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            )}
+                  {p.status === 'active' ? (
+                    // Active projects are protected — enforced on the backend too.
+                    <button
+                      disabled
+                      title="Active projects can't be deleted. Mark it Completed first."
+                      className="cursor-not-allowed text-muted/40"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setDeleteError(''); setDeleteId(p.id) }}
+                      className="text-muted hover:text-danger"
+                      title="Delete project"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ))}
         {filtered.length === 0 && (
@@ -239,8 +277,7 @@ export default function Projects() {
             </Field>
             <Field label="Status">
               <FormSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
+                {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
               </FormSelect>
             </Field>
             <Field label="Approved Budget (₹)">
@@ -252,13 +289,29 @@ export default function Projects() {
             <Field label="Location">
               <TextInput placeholder="City, State" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
             </Field>
-            <Field label="Start Date">
-              <DatePicker value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
+            <Field label="Start Date *">
+              <DatePicker required value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
             </Field>
             <Field label="End Date">
-              <DatePicker value={form.endDate} onChange={(iso) => setForm({ ...form, endDate: iso })} />
+              <DatePicker
+                value={form.ongoing ? '' : form.endDate}
+                onChange={(iso) => setForm({ ...form, endDate: iso })}
+                disabled={form.ongoing}
+                placeholder={form.ongoing ? 'Ongoing — no end date' : 'Select date'}
+              />
             </Field>
           </div>
+          <Checkbox
+            checked={form.ongoing}
+            onChange={(v) => setForm({ ...form, ongoing: v, endDate: v ? '' : form.endDate })}
+            label="Ongoing project"
+            hint="(still running — no fixed end date)"
+          />
+          {REASON_REQUIRED.includes(form.status) && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+              A description or notes entry is required for {form.status === 'on_hold' ? 'On Hold' : 'Cancelled'} projects.
+            </p>
+          )}
           <Field label="Description">
             <TextArea rows={3} placeholder="Project description…" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
@@ -276,6 +329,34 @@ export default function Projects() {
           </div>
         </form>
       </Modal>
+
+      <DetailModal
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing?.name ?? 'Project'}
+        rows={
+          viewing
+            ? [
+                { label: 'Company', value: companyName(viewing.companyId) },
+                { label: 'Financial Year', value: yearName(viewing.financialYearId) },
+                { label: 'Status', value: <StatusBadge status={viewing.status} /> },
+                { label: 'Budget', value: formatINR(viewing.budget) },
+                { label: 'Category', value: viewing.category },
+                { label: 'Location', value: viewing.location },
+                { label: 'Period', value: period(viewing) },
+                { label: 'Created By', value: viewing.createdByName || viewing.createdByEmail },
+              ]
+            : []
+        }
+        sections={
+          viewing
+            ? [
+                { label: 'Description', value: viewing.description },
+                { label: 'Notes', value: viewing.notes },
+              ]
+            : []
+        }
+      />
 
       <ConfirmDialog
         open={!!deleteId}

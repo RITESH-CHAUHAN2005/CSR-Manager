@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Mail, MapPin, Pencil, Phone, User } from '../components/icons'
+import { ArrowLeft, Eye, Mail, MapPin, Pencil, Phone, User } from '../components/icons'
 import {
   companyService,
   expenditureService,
@@ -9,12 +9,13 @@ import {
   fundReceiptService,
   projectService,
 } from '../services/dataService'
-import type { Company } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
+import type { Company, Project } from '../types'
 import {
   Card,
+  DetailModal,
   Field,
   Modal,
   StatusBadge,
@@ -79,6 +80,15 @@ export default function CompanyDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [myReceipts, years],
   )
+
+  const projectPeriod = (p: Project) => {
+    const start = p.startDate ? formatDate(String(p.startDate)) : ''
+    if (p.ongoing) return start ? `${start} – Ongoing` : 'Ongoing'
+    return [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
+  }
+
+  // ---- Project detail view ----
+  const [viewProject, setViewProject] = useState<Project | null>(null)
 
   // ---- Inline edit ----
   const [editOpen, setEditOpen] = useState(false)
@@ -239,6 +249,13 @@ export default function CompanyDetail() {
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="font-semibold text-ink">{formatINR(p.budget)}</span>
                   <StatusBadge status={p.status} />
+                  <button
+                    onClick={() => setViewProject(p)}
+                    className="text-muted hover:text-primary"
+                    title="View details, description & notes"
+                  >
+                    <Eye size={16} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -271,6 +288,33 @@ export default function CompanyDetail() {
           />
         )}
       </Card>
+
+      {/* Project detail view */}
+      <DetailModal
+        open={!!viewProject}
+        onClose={() => setViewProject(null)}
+        title={viewProject?.name ?? 'Project'}
+        rows={
+          viewProject
+            ? [
+                { label: 'Financial Year', value: yearName(viewProject.financialYearId) },
+                { label: 'Status', value: <StatusBadge status={viewProject.status} /> },
+                { label: 'Budget', value: formatINR(viewProject.budget) },
+                { label: 'Category', value: viewProject.category },
+                { label: 'Location', value: viewProject.location },
+                { label: 'Period', value: projectPeriod(viewProject) },
+              ]
+            : []
+        }
+        sections={
+          viewProject
+            ? [
+                { label: 'Description', value: viewProject.description },
+                { label: 'Notes', value: viewProject.notes },
+              ]
+            : []
+        }
+      />
 
       {/* Edit modal */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit Donor Company">

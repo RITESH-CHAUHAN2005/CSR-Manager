@@ -53,6 +53,30 @@ body {
   }
 }
 
+/* Native form controls follow the active theme (dark checkboxes, spinners, etc.). */
+input,
+textarea,
+select {
+  color-scheme: inherit;
+}
+
+/* Kill the white/yellow browser autofill background in dark mode — the most common
+   "white field on a dark theme" offender (login email/password, any saved value).
+   We repaint the fill with the surface color and keep the text in the ink color. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: rgb(var(--color-ink));
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--color-surface)) inset;
+  box-shadow: 0 0 0 1000px rgb(var(--color-surface)) inset;
+  caret-color: rgb(var(--color-ink));
+  border-color: rgb(var(--color-line));
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Thin, subtle, theme-aware scrollbars */
 ::-webkit-scrollbar {
   width: 10px;
@@ -66,12 +90,13 @@ body {
   background: rgb(var(--color-muted) / 0.6);
 }
 
-/* Flatpickr calendar — themed to the brand palette (light + dark) */
+/* Flatpickr calendar — themed to the brand palette (light + dark).
+   !important guards against flatpickr.min.css (white defaults) winning on CSS order. */
 .flatpickr-calendar {
-  background: rgb(var(--color-surface));
-  border: 1px solid rgb(var(--color-line));
+  background-color: rgb(var(--color-surface)) !important;
+  border: 1px solid rgb(var(--color-line)) !important;
   box-shadow: var(--glass-shadow);
-  color: rgb(var(--color-ink));
+  color: rgb(var(--color-ink)) !important;
 }
 .flatpickr-calendar.arrowTop::before,
 .flatpickr-calendar.arrowTop::after,
@@ -84,8 +109,8 @@ body {
 .flatpickr-current-month .flatpickr-monthDropdown-months,
 .flatpickr-weekday,
 .flatpickr-day {
-  color: rgb(var(--color-ink));
-  fill: rgb(var(--color-ink));
+  color: rgb(var(--color-ink)) !important;
+  fill: rgb(var(--color-ink)) !important;
 }
 .flatpickr-day.flatpickr-disabled,
 .flatpickr-day.prevMonthDay,
@@ -118,8 +143,8 @@ body {
   background: transparent;
 }
 .flatpickr-monthDropdown-months .flatpickr-monthDropdown-month {
-  background: rgb(var(--color-surface));
-  color: rgb(var(--color-ink));
+  background-color: rgb(var(--color-surface)) !important;
+  color: rgb(var(--color-ink)) !important;
 }
 .flatpickr-weekdays,
 .flatpickr-weekday {
@@ -137,12 +162,14 @@ body {
   display: flex;
   align-items: center;
   height: 42px;
-  border: 1px solid rgb(var(--color-line));
+  border: 1px solid rgb(var(--color-line)) !important;
   border-radius: 0.75rem;
-  background: rgb(var(--color-surface) / 0.6);
+  /* !important so select2.min.css's default white background can't win in dark mode. */
+  background-color: rgb(var(--color-surface)) !important;
+  background-image: none !important;
 }
 .select2-container--default .select2-selection--single .select2-selection__rendered {
-  color: rgb(var(--color-ink));
+  color: rgb(var(--color-ink)) !important;
   line-height: normal;
   padding-left: 0.875rem;
   padding-right: 2rem;
@@ -167,9 +194,10 @@ body {
 }
 /* Dropdown panel — rounded card */
 .select2-container--default .select2-dropdown,
-.csr-select2-dropdown {
-  background: rgb(var(--color-surface));
-  border: 1px solid rgb(var(--color-line));
+.csr-select2-dropdown,
+.select2-dropdown {
+  background-color: rgb(var(--color-surface)) !important;
+  border: 1px solid rgb(var(--color-line)) !important;
   border-radius: 0.875rem;
   box-shadow: var(--glass-shadow);
   overflow: hidden;
@@ -198,8 +226,8 @@ body {
 .select2-container--default .select2-search--dropdown .select2-search__field {
   border: 1px solid rgb(var(--color-line));
   border-radius: 0.5rem;
-  background: rgb(var(--color-surface));
-  color: rgb(var(--color-ink));
+  background-color: rgb(var(--color-surface)) !important;
+  color: rgb(var(--color-ink)) !important;
   padding: 7px 10px;
   outline: none;
 }
@@ -252,8 +280,8 @@ body {
 .csr-dt .dt-length select {
   border: 1px solid rgb(var(--color-line));
   border-radius: 0.625rem;
-  background: rgb(var(--color-surface) / 0.6);
-  color: rgb(var(--color-ink));
+  background-color: rgb(var(--color-surface)) !important;
+  color: rgb(var(--color-ink)) !important;
   padding: 7px 11px;
   margin-left: 6px;
   outline: none;

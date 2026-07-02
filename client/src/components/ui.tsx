@@ -87,10 +87,16 @@ export function DangerButton({
 }
 
 // ---------------- StatusBadge ----------------
+const STATUS_LABELS: Record<string, string> = {
+  on_hold: 'On Hold',
+  cancelled: 'Cancelled',
+}
 export function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: 'bg-success/15 text-success ring-success/20',
     completed: 'bg-primary/15 text-primary ring-primary/20',
+    on_hold: 'bg-warning/15 text-warning ring-warning/25',
+    cancelled: 'bg-danger/15 text-danger ring-danger/20',
     approved: 'bg-success/15 text-success ring-success/20',
     pending: 'bg-warning/15 text-warning ring-warning/25',
     rejected: 'bg-danger/15 text-danger ring-danger/20',
@@ -101,7 +107,7 @@ export function StatusBadge({ status }: { status: string }) {
         styles[status] ?? 'bg-ink/10 text-muted ring-ink/10'
       }`}
     >
-      {status}
+      {STATUS_LABELS[status] ?? status}
     </span>
   )
 }
@@ -276,6 +282,62 @@ export function Modal({
   )
 }
 
+// ---------------- DetailModal ----------------
+// Read-only detail view reused by the list pages: a compact key/value grid for
+// short facts (date, financial year, amount…) plus long-text sections
+// (description, notes). Empty long-text sections show a muted placeholder so it's
+// always clear whether the editor/admin actually wrote something.
+export function DetailModal({
+  open,
+  onClose,
+  title,
+  rows = [],
+  sections = [],
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  rows?: { label: string; value: ReactNode }[]
+  sections?: { label: string; value?: string }[]
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={title}>
+      {rows.length > 0 && (
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+          {rows.map((r) => (
+            <div key={r.label}>
+              <dt className="text-xs font-medium uppercase tracking-wide text-muted">{r.label}</dt>
+              <dd className="mt-0.5 text-sm text-ink">{r.value || <span className="text-muted">—</span>}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {sections.length > 0 && (
+        <div className="mt-5 space-y-4 border-t border-line/60 pt-4">
+          {sections.map((s) => (
+            <div key={s.label}>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">{s.label}</p>
+              {s.value?.trim() ? (
+                <p className="whitespace-pre-wrap text-sm text-ink">{s.value}</p>
+              ) : (
+                <p className="text-sm italic text-muted">Not provided.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-6 flex justify-end">
+        <button
+          onClick={onClose}
+          className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5"
+        >
+          Close
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 // ---------------- Form fields ----------------
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -297,6 +359,34 @@ export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return <textarea {...props} className={inputClass} />
 }
 
+// Small inline checkbox with a label (theme-aware; accent follows the brand color).
+export function Checkbox({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+  hint?: string
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 text-sm text-ink">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 shrink-0 cursor-pointer rounded border-line bg-surface text-primary accent-[rgb(var(--color-primary))] focus:ring-2 focus:ring-primary/30"
+      />
+      <span>
+        {label}
+        {hint && <span className="ml-1 text-muted">{hint}</span>}
+      </span>
+    </label>
+  )
+}
+
 // Select2-backed form dropdown (same API as a native <select>).
 export function FormSelect({ children, value, onChange }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
@@ -314,11 +404,13 @@ export function DatePicker({
   value,
   onChange,
   required,
+  disabled,
   placeholder = 'Select date',
 }: {
   value: string
   onChange: (iso: string) => void
   required?: boolean
+  disabled?: boolean
   placeholder?: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
@@ -353,6 +445,16 @@ export function DatePicker({
     if (value && value !== fp.input.value) fp.setDate(value, false)
     else if (!value && fp.input.value) fp.clear(false)
   }, [value])
+
+  // Reflect the disabled + required + placeholder state onto flatpickr's altInput.
+  useEffect(() => {
+    const fp = fpRef.current
+    if (!fp?.altInput) return
+    fp.set('clickOpens', !disabled)
+    fp.altInput.disabled = Boolean(disabled)
+    fp.altInput.required = Boolean(required)
+    fp.altInput.placeholder = placeholder
+  }, [disabled, required, placeholder])
 
   return <input ref={ref} type="text" className={inputClass} />
 }

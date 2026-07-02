@@ -27,6 +27,8 @@ export {
   TrendUp as TrendingUp,
   Wallet,
   Trash as Trash2,
+  Eye,
+  Info,
   PencilSimple as Pencil,
   DownloadSimple as FileDown,
   ShareNetwork as Share,
