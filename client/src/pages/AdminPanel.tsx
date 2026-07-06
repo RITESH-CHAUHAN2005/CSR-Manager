@@ -9,6 +9,7 @@ import {
   ConfirmDialog,
   Field,
   FormSelect,
+  Modal,
   PageHeader,
   PrimaryButton,
   Select,
@@ -43,6 +44,7 @@ export default function AdminPanel() {
   const [shareNote, setShareNote] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [clearOpen, setClearOpen] = useState(false)
+  const [roleModal, setRoleModal] = useState<'all' | 'admin' | 'editor' | 'viewer' | null>(null)
   const [form, setForm] = useState<NewUserInput>(emptyUser)
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
@@ -122,10 +124,15 @@ export default function AdminPanel() {
 
       {/* Stat cards */}
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Total Users" value={String(users.length)} icon={<UsersThree size={18} />} />
-        <Stat label="Admins" value={String(adminCount)} />
-        <Stat label="Editors" value={String(editorCount)} />
-        <Stat label="Viewers" value={String(viewerCount)} />
+        <Stat
+          label="Total Users"
+          value={String(users.length)}
+          icon={<UsersThree size={18} />}
+          onClick={() => setRoleModal('all')}
+        />
+        <Stat label="Admins" value={String(adminCount)} onClick={() => setRoleModal('admin')} />
+        <Stat label="Editors" value={String(editorCount)} onClick={() => setRoleModal('editor')} />
+        <Stat label="Viewers" value={String(viewerCount)} onClick={() => setRoleModal('viewer')} />
       </div>
 
       {/* Create user */}
@@ -325,7 +332,49 @@ export default function AdminPanel() {
         onCancel={() => setClearOpen(false)}
         onConfirm={() => { clearM.mutate(); setClearOpen(false) }}
       />
+
+      <Modal
+        open={roleModal !== null}
+        onClose={() => setRoleModal(null)}
+        title={
+          roleModal === 'all'
+            ? `Total Users (${users.length})`
+            : `${roleModal ? roleModal.charAt(0).toUpperCase() + roleModal.slice(1) : ''}s`
+        }
+      >
+        <RoleUserList
+          users={roleModal === 'all' ? users : users.filter((u) => u.role === roleModal)}
+        />
+      </Modal>
     </>
+  )
+}
+
+function RoleUserList({ users }: { users: ManagedUser[] }) {
+  if (users.length === 0) {
+    return <p className="py-6 text-center text-sm text-muted">No users in this role.</p>
+  }
+  return (
+    <ul className="divide-y divide-line/60">
+      {users.map((u) => (
+        <li key={u.id} className="flex items-center justify-between gap-3 py-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-ink">{u.name}</p>
+            <p className="truncate text-xs text-muted">{u.email}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span
+              className={`rounded-md px-2 py-0.5 text-xs font-medium capitalize ${
+                roleBadge[u.role] ?? 'bg-ink/10 text-muted'
+              }`}
+            >
+              {u.role}
+            </span>
+            <span className="text-xs text-muted">{companyName(u.companyId)}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -356,14 +405,26 @@ function LogDetails({ log }: { log: AuditLogEntry }) {
   )
 }
 
-function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+function Stat({
+  label,
+  value,
+  icon,
+  onClick,
+}: {
+  label: string
+  value: string
+  icon?: React.ReactNode
+  onClick: () => void
+}) {
   return (
-    <Card className="lift p-5">
-      <div className="flex items-start justify-between">
-        <p className="text-sm text-muted">{label}</p>
-        {icon && <span className="text-primary">{icon}</span>}
-      </div>
-      <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
+    <Card className="lift p-5 transition-colors hover:bg-ink/[0.03]">
+      <button type="button" onClick={onClick} className="w-full text-left">
+        <div className="flex items-start justify-between">
+          <p className="text-sm text-muted">{label}</p>
+          {icon && <span className="text-primary">{icon}</span>}
+        </div>
+        <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
+      </button>
     </Card>
   )
 }

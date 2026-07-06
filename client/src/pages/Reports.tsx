@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArcElement,
   BarElement,
   CategoryScale,
   Chart as ChartJS,
@@ -8,7 +9,8 @@ import {
   LinearScale,
   Tooltip as CJTooltip,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import { Bar, Pie } from "react-chartjs-2";
 import { FileDown, FileText } from "../components/icons";
 import {
   analyticsService,
@@ -25,12 +27,104 @@ import { DataTable } from "../components/DataTable";
 import { downloadCsv, printReport, saveBlob } from "../lib/exporters";
 import { useAuth } from "../context/AuthContext";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, CJTooltip, CJLegend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, CJTooltip, CJLegend, ChartDataLabels);
 
 type Tab = "year" | "company" | "project";
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const money = (d: unknown, type: string) =>
   type === "display" ? formatINR(Number(d)) : Number(d);
+
+// Shared categorical palette so the year/company/project donuts stay visually
+// consistent with each other no matter how many slices they end up with.
+const CHART_PALETTE = [
+  "#2563EB", "#F59E0B", "#22C55E", "#EF4444", "#8B5CF6",
+  "#14B8A6", "#EC4899", "#06B6D4", "#F97316", "#64748B",
+];
+const colorFor = (i: number) => CHART_PALETTE[i % CHART_PALETTE.length];
+
+const STATUS_COLORS: Record<string, string> = {
+  active: "#22C55E",
+  completed: "#2563EB",
+  on_hold: "#F59E0B",
+  cancelled: "#EF4444",
+};
+const STATUS_LABELS: Record<string, string> = {
+  active: "Active",
+  completed: "Completed",
+  on_hold: "On Hold",
+  cancelled: "Cancelled",
+};
+
+function moneyBarOptions({ rotateLabels = false }: { rotateLabels?: boolean } = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" as const, labels: { usePointStyle: true, pointStyle: "circle", color: "#94a3b8", boxWidth: 8, font: { size: 13 } } },
+      tooltip: { callbacks: { label: (c: any) => ` ${c.dataset.label}: ${formatINR(c.parsed.y)}` }, padding: 10, cornerRadius: 10 },
+      datalabels: { display: false },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { color: "rgba(148,163,184,0.22)" },
+        ticks: rotateLabels
+          ? { color: "#94a3b8", maxRotation: 40, minRotation: 40, autoSkip: false, font: { size: 11 } }
+          : { color: "#94a3b8" },
+      },
+      y: { grid: { color: "rgba(148,163,184,0.18)" }, border: { display: false }, ticks: { color: "#94a3b8", callback: (v: any) => formatLakhAxis(Number(v)) } },
+    },
+  } as any;
+}
+
+function pieOptions(formatValue: (v: number) => string = formatINR) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: "bottom" as const,
+        labels: { usePointStyle: true, pointStyle: "circle", color: "#94a3b8", boxWidth: 8, padding: 12, font: { size: 12 } },
+      },
+      tooltip: {
+        callbacks: {
+          label: (c: any) => {
+            const val = Number(c.parsed);
+            const total = (c.dataset.data as number[]).reduce((a, b) => a + Number(b), 0);
+            const pct = total ? Math.round((val / total) * 100) : 0;
+            return ` ${c.label}: ${formatValue(val)} (${pct}%)`;
+          },
+        },
+        padding: 10,
+        cornerRadius: 10,
+      },
+      datalabels: {
+        color: "#fff",
+        font: { size: 12, weight: "bold" as const },
+        formatter: (val: number, ctx: any) => {
+          const total = (ctx.dataset.data as number[]).reduce((a: number, b: number) => a + Number(b), 0);
+          const pct = total ? Math.round((Number(val) / total) * 100) : 0;
+          return pct > 0 ? `${pct}%` : "";
+        },
+        textStrokeColor: "rgba(0,0,0,0.35)",
+        textStrokeWidth: 3,
+      },
+    },
+  } as any;
+}
+
+function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card className="p-5">
+      <h2 className="mb-4 font-semibold text-ink">{title}</h2>
+      <div className="h-[320px]">{children}</div>
+    </Card>
+  );
+}
+
+function EmptyChartNote({ text = "No data to display yet." }: { text?: string }) {
+  return <div className="flex h-full items-center justify-center text-sm text-muted">{text}</div>;
+}
 
 export default function Reports() {
   const { canWrite } = useAuth();
@@ -167,6 +261,82 @@ export default function Reports() {
         }),
     [projects, ex, companies, years, companyFilter, yearFilter],
   );
+
+  // ---- Chart datasets (real backend-derived rows, same source as the tables) ----
+  const yearPie = useMemo(() => {
+    const rows = yearRows.filter((r) => r.expenditure > 0);
+    return {
+      labels: rows.map((r) => r.name),
+      datasets: [
+        {
+          data: rows.map((r) => r.expenditure),
+          backgroundColor: rows.map((_, i) => colorFor(i)),
+          borderWidth: 0,
+          hoverOffset: 6,
+        },
+      ],
+    };
+  }, [yearRows]);
+
+  const companyBarData = useMemo(
+    () => ({
+      labels: companyRows.map((r) => r.name),
+      datasets: [
+        { label: "Received", data: companyRows.map((r) => r.received), backgroundColor: "#2563EB", borderRadius: 8, maxBarThickness: 38 },
+        { label: "Expenditure", data: companyRows.map((r) => r.expenditure), backgroundColor: "#F59E0B", borderRadius: 8, maxBarThickness: 38 },
+      ],
+    }),
+    [companyRows],
+  );
+
+  const companyPie = useMemo(() => {
+    const rows = companyRows.filter((r) => r.expenditure > 0);
+    return {
+      labels: rows.map((r) => r.name),
+      datasets: [
+        {
+          data: rows.map((r) => r.expenditure),
+          backgroundColor: rows.map((_, i) => colorFor(i)),
+          borderWidth: 0,
+          hoverOffset: 6,
+        },
+      ],
+    };
+  }, [companyRows]);
+
+  const projectBarRows = useMemo(
+    () => [...projectRows].sort((a, b) => b.budget - a.budget).slice(0, 10),
+    [projectRows],
+  );
+  const projectBarData = useMemo(
+    () => ({
+      labels: projectBarRows.map((r) => r.name),
+      datasets: [
+        { label: "Budget", data: projectBarRows.map((r) => r.budget), backgroundColor: "#2563EB", borderRadius: 8, maxBarThickness: 30 },
+        { label: "Spent", data: projectBarRows.map((r) => r.spent), backgroundColor: "#F59E0B", borderRadius: 8, maxBarThickness: 30 },
+      ],
+    }),
+    [projectBarRows],
+  );
+
+  const statusPie = useMemo(() => {
+    const counts: Record<string, number> = {};
+    projectRows.forEach((r) => {
+      counts[r.status] = (counts[r.status] ?? 0) + 1;
+    });
+    const keys = Object.keys(counts);
+    return {
+      labels: keys.map((k) => STATUS_LABELS[k] ?? k),
+      datasets: [
+        {
+          data: keys.map((k) => counts[k]),
+          backgroundColor: keys.map((k) => STATUS_COLORS[k] ?? "#64748B"),
+          borderWidth: 0,
+          hoverOffset: 6,
+        },
+      ],
+    };
+  }, [projectRows]);
 
   // Proper server-generated PDF/Excel of the active report. Falls back to the
   // client-side CSV / print path when the API isn't available (offline mock mode).
@@ -330,35 +500,30 @@ export default function Reports() {
       <div id="report-printable">
         {tab === "year" && (
           <>
-            <Card className="mb-6 p-5">
-              <h2 className="mb-4 font-semibold text-ink">
-                Fund Flow by Financial Year
-              </h2>
-              <div className="h-[320px]">
-                <Bar
-                  data={{
-                    labels: yearRows.map((r) => r.name),
-                    datasets: [
-                      { label: "Received", data: yearRows.map((r) => r.fundsReceived), backgroundColor: "#2563EB", borderRadius: 8, maxBarThickness: 38 },
-                      { label: "Carry In", data: yearRows.map((r) => r.carryForwardIn), backgroundColor: "#60A5FA", borderRadius: 8, maxBarThickness: 38 },
-                      { label: "Expenditure", data: yearRows.map((r) => r.expenditure), backgroundColor: "#F59E0B", borderRadius: 8, maxBarThickness: 38 },
-                    ],
-                  }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", color: "#94a3b8", boxWidth: 8, font: { size: 13 } } },
-                      tooltip: { callbacks: { label: (c: any) => ` ${c.dataset.label}: ${formatINR(c.parsed.y)}` }, padding: 10, cornerRadius: 10 },
-                    },
-                    scales: {
-                      x: { grid: { display: false }, border: { color: "rgba(148,163,184,0.22)" }, ticks: { color: "#94a3b8" } },
-                      y: { grid: { color: "rgba(148,163,184,0.18)" }, border: { display: false }, ticks: { color: "#94a3b8", callback: (v: any) => formatLakhAxis(Number(v)) } },
-                    },
-                  } as any}
-                />
+            <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <ChartCard title="Fund Flow by Financial Year">
+                  <Bar
+                    data={{
+                      labels: yearRows.map((r) => r.name),
+                      datasets: [
+                        { label: "Received", data: yearRows.map((r) => r.fundsReceived), backgroundColor: "#2563EB", borderRadius: 8, maxBarThickness: 38 },
+                        { label: "Carry In", data: yearRows.map((r) => r.carryForwardIn), backgroundColor: "#60A5FA", borderRadius: 8, maxBarThickness: 38 },
+                        { label: "Expenditure", data: yearRows.map((r) => r.expenditure), backgroundColor: "#F59E0B", borderRadius: 8, maxBarThickness: 38 },
+                      ],
+                    }}
+                    options={moneyBarOptions()}
+                  />
+                </ChartCard>
               </div>
-            </Card>
+              <ChartCard title="Expenditure Share by Year">
+                {yearPie.labels.length > 0 ? (
+                  <Pie data={yearPie} options={pieOptions()} />
+                ) : (
+                  <EmptyChartNote />
+                )}
+              </ChartCard>
+            </div>
 
             <Card className="p-2 sm:p-4">
               <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
@@ -386,7 +551,27 @@ export default function Reports() {
         )}
 
         {tab === "company" && (
-          <Card className="p-2 sm:p-4">
+          <>
+            <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <ChartCard title="Received vs Expenditure by Company">
+                  {companyRows.length > 0 ? (
+                    <Bar data={companyBarData} options={moneyBarOptions()} />
+                  ) : (
+                    <EmptyChartNote />
+                  )}
+                </ChartCard>
+              </div>
+              <ChartCard title="Expenditure Share by Company">
+                {companyPie.labels.length > 0 ? (
+                  <Pie data={companyPie} options={pieOptions()} />
+                ) : (
+                  <EmptyChartNote />
+                )}
+              </ChartCard>
+            </div>
+
+            <Card className="p-2 sm:p-4">
             <DataTable
               data={companyRows}
               columns={[
@@ -404,10 +589,36 @@ export default function Reports() {
               options={{ searching: false, order: [] }}
             />
           </Card>
+          </>
         )}
 
         {tab === "project" && (
-          <Card className="p-2 sm:p-4">
+          <>
+            <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <ChartCard title="Budget vs Spent by Project">
+                  {projectBarRows.length > 0 ? (
+                    <Bar data={projectBarData} options={moneyBarOptions({ rotateLabels: projectBarRows.length > 4 })} />
+                  ) : (
+                    <EmptyChartNote />
+                  )}
+                </ChartCard>
+                {projectRows.length > projectBarRows.length && (
+                  <p className="mt-2 text-xs text-muted">
+                    Showing top {projectBarRows.length} of {projectRows.length} projects by budget.
+                  </p>
+                )}
+              </div>
+              <ChartCard title="Projects by Status">
+                {statusPie.labels.length > 0 ? (
+                  <Pie data={statusPie} options={pieOptions((v) => `${v} project${v === 1 ? "" : "s"}`)} />
+                ) : (
+                  <EmptyChartNote />
+                )}
+              </ChartCard>
+            </div>
+
+            <Card className="p-2 sm:p-4">
             <DataTable
               data={projectRows}
               columns={[
@@ -426,6 +637,7 @@ export default function Reports() {
               options={{ searching: false, order: [] }}
             />
           </Card>
+          </>
         )}
       </div>
     </>

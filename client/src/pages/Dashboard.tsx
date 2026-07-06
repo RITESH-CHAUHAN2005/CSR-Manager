@@ -59,6 +59,7 @@ export default function Dashboard() {
         padding: 10,
         cornerRadius: 10,
       },
+      datalabels: { display: false },
     },
     scales: {
       x: { grid: { display: false }, border: { color: GRID }, ticks: { color: AXIS } },
@@ -93,6 +94,7 @@ export default function Dashboard() {
         padding: 10,
         cornerRadius: 10,
       },
+      datalabels: { display: false },
     },
   }
 
