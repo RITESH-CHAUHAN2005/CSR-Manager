@@ -1,15 +1,20 @@
 import mongoose, { Schema, type Document, type Types } from 'mongoose'
 import { baseToJSON, createdByFields } from './_shared.js'
 
+export type DerivedStatus = 'ongoing' | 'other'
+
 export interface IProject extends Document {
   name: string
-  companyId: Types.ObjectId
-  financialYearId: Types.ObjectId
+  companyIds: Types.ObjectId[]
   category: string
   location: string
   budget: number
   status: 'active' | 'completed' | 'on_hold' | 'cancelled'
-  ongoing: boolean
+  // Ongoing = still running; end date auto-extends 4 years past the current FY.
+  // Other = end date is fixed to the current FY's end date. Carry-forward for an
+  // Ongoing project is recorded per-expenditure (see Expenditure.carryForwardAmount),
+  // not on the project itself.
+  derivedStatus: DerivedStatus
   description: string
   startDate?: string
   endDate?: string
@@ -19,8 +24,14 @@ export interface IProject extends Document {
 const projectSchema = new Schema<IProject>(
   {
     name: { type: String, required: true, trim: true },
-    companyId: { type: Schema.Types.ObjectId, ref: 'Company', required: true, index: true },
-    financialYearId: { type: Schema.Types.ObjectId, ref: 'FinancialYear', required: true, index: true },
+    companyIds: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'Company' }],
+      required: true,
+      validate: {
+        validator: (v: unknown[]) => Array.isArray(v) && v.length > 0,
+        message: 'At least one company is required',
+      },
+    },
     category: { type: String, default: '', trim: true },
     location: { type: String, default: '', trim: true },
     budget: { type: Number, default: 0, min: 0 },
@@ -29,8 +40,7 @@ const projectSchema = new Schema<IProject>(
       enum: ['active', 'completed', 'on_hold', 'cancelled'],
       default: 'active',
     },
-    // Marks a project that is still running with no fixed end date.
-    ongoing: { type: Boolean, default: false },
+    derivedStatus: { type: String, enum: ['ongoing', 'other'], default: 'other' },
     description: { type: String, default: '', trim: true },
     startDate: { type: String, default: '' },
     endDate: { type: String, default: '' },

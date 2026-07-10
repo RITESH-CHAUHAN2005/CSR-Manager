@@ -152,14 +152,11 @@ async function run() {
   // 14. Active projects are protected — cannot be deleted until marked Completed.
   r = await fetch(`${BASE}/companies`, { headers: { cookie: adminCookie } })
   const companies = await r.json()
-  r = await fetch(`${BASE}/financial-years`, { headers: { cookie: adminCookie } })
-  const years = await r.json()
-  const activeYear = years.find((y: { isActive: boolean }) => y.isActive) ?? years[0]
   r = await fetch(`${BASE}/projects`, {
     method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
     body: JSON.stringify({
-      name: 'Delete-Guard Test', companyId: companies[0].id,
-      financialYearId: activeYear.id, status: 'active', budget: 1000,
+      name: 'Delete-Guard Test', companyIds: [companies[0].id], derivedStatus: 'other',
+      startDate: new Date().toISOString().slice(0, 10), status: 'active', budget: 1000,
     }),
   })
   const proj = await r.json()

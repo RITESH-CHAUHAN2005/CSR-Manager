@@ -317,6 +317,21 @@ select:-webkit-autofill {
   color: rgb(var(--color-muted)) !important;
   opacity: 0.5;
 }
+/* Full-grid variant: horizontal AND vertical border lines (record-heavy detail
+   views — e.g. Company Detail) instead of just row separators. `csr-dt-grid` is
+   applied straight onto the <table> (same element as `dataTable`), not a wrapper. */
+table.dataTable.csr-dt-grid {
+  border: 1px solid rgb(var(--color-line));
+}
+table.dataTable.csr-dt-grid thead th,
+table.dataTable.csr-dt-grid tbody td {
+  border-right: 1px solid rgb(var(--color-line) / 0.6);
+}
+table.dataTable.csr-dt-grid thead th:last-child,
+table.dataTable.csr-dt-grid tbody td:last-child {
+  border-right: none;
+}
+
 /* Sort indicators in the brand color */
 .csr-dt table.dataTable thead th.dt-orderable-asc:hover,
 .csr-dt table.dataTable thead th.dt-orderable-desc:hover {

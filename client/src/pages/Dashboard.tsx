@@ -12,13 +12,14 @@ import { Bar, Doughnut } from 'react-chartjs-2'
 import { Briefcase, FileText, TrendingUp, Wallet } from '../components/icons'
 import { analyticsService } from '../services/dataService'
 import { formatINR, formatLakhAxis } from '../lib/currency'
+import { CHART_COLORS, CHART_PALETTE } from '../lib/chartColors'
 import { Card } from '../components/ui'
 import { DataTable } from '../components/DataTable'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, CJTooltip, CJLegend)
 
-// Modern palette: blue / green / orange / purple / cyan.
-const PIE_COLORS = ['#2563EB', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4']
+// Shared with Reports.tsx so a company/series reads the same color on every page.
+const PIE_COLORS = CHART_PALETTE
 const AXIS = '#94a3b8'
 const GRID = 'rgba(148, 163, 184, 0.18)'
 
@@ -33,14 +34,14 @@ export default function Dashboard() {
       {
         label: 'Received',
         data: data.yearWise.map((y) => y.received),
-        backgroundColor: '#2563EB',
+        backgroundColor: CHART_COLORS.received,
         borderRadius: 8,
         maxBarThickness: 44,
       },
       {
         label: 'Expenditure',
         data: data.yearWise.map((y) => y.expenditure),
-        backgroundColor: '#F59E0B',
+        backgroundColor: CHART_COLORS.expenditure,
         borderRadius: 8,
         maxBarThickness: 44,
       },

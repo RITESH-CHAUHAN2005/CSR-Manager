@@ -29,9 +29,9 @@
   --color-warning: 245 158 11;    /* #F59E0B */
   --color-danger: 239 68 68;      /* #EF4444 */
 
-  /* Sidebar — dark navy */
-  --color-sidebar: 15 23 42;      /* #0F172A */
-  --color-sidebar-hover: 30 41 59;/* #1E293B */
+  /* Sidebar — follows the light surface so it doesn't look stuck in dark mode */
+  --color-sidebar: 255 255 255;   /* #FFFFFF */
+  --color-sidebar-hover: 241 245 249; /* #F1F5F9 */
   --color-canvas: 248 250 252;    /* legacy alias of --color-bg */
 
   /* Glassmorphism */

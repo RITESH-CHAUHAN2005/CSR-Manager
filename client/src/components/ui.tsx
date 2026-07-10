@@ -406,12 +406,15 @@ export function DatePicker({
   required,
   disabled,
   placeholder = 'Select date',
+  maxDate,
 }: {
   value: string
   onChange: (iso: string) => void
   required?: boolean
   disabled?: boolean
   placeholder?: string
+  // Pass "today" to block future dates (used for Start Date / Receipt Date).
+  maxDate?: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
   const fpRef = useRef<Instance | null>(null)
@@ -427,6 +430,7 @@ export function DatePicker({
       allowInput: true,
       monthSelectorType: 'dropdown',
       defaultDate: value || undefined,
+      maxDate,
       onChange: (_dates, iso) => onChangeRef.current(iso),
     }) as Instance
     if (fp.altInput) {
@@ -455,6 +459,10 @@ export function DatePicker({
     fp.altInput.required = Boolean(required)
     fp.altInput.placeholder = placeholder
   }, [disabled, required, placeholder])
+
+  useEffect(() => {
+    fpRef.current?.set('maxDate', maxDate)
+  }, [maxDate])
 
   return <input ref={ref} type="text" className={inputClass} />
 }

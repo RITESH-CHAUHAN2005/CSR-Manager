@@ -4,12 +4,18 @@ import { Eye, Pencil, Trash2 } from '../components/icons'
 import {
   companyService,
   financialYearService,
+  fundReceiptService,
+  masterDataService,
+  projectDocumentService,
   projectService,
 } from '../services/dataService'
-import type { Project, ProjectStatus } from '../types'
+import type { DerivedStatus, Project, ProjectStatus } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
+import { previewProjectEndDate } from '../lib/financialYear'
+import { contributionsForProject } from '../lib/projectContributions'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
+import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
 import {
   Checkbox,
   ConfirmDialog,
@@ -38,15 +44,13 @@ const REASON_REQUIRED: ProjectStatus[] = ['on_hold', 'cancelled']
 
 const emptyForm = {
   name: '',
-  companyId: '',
-  financialYearId: '',
+  companyIds: [] as string[],
   status: 'active' as ProjectStatus,
-  ongoing: false,
+  derivedStatus: 'other' as DerivedStatus,
   budget: 0,
   category: '',
   location: '',
   startDate: '',
-  endDate: '',
   description: '',
   notes: '',
 }
@@ -60,34 +64,38 @@ export default function Projects() {
     queryKey: ['financial-years'],
     queryFn: financialYearService.list,
   })
+  const { data: masterData = [] } = useQuery({ queryKey: ['master-data'], queryFn: masterDataService.list })
+  const { data: receipts = [] } = useQuery({ queryKey: ['fund-receipts'], queryFn: fundReceiptService.list })
+  const categoryOptions = useMemo(() => masterData.filter((m) => m.type === 'category'), [masterData])
 
   const [companyFilter, setCompanyFilter] = useState('')
-  const [yearFilter, setYearFilter] = useState('')
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
   const [viewing, setViewing] = useState<Project | null>(null)
   const [form, setForm] = useState(emptyForm)
+  // Staged for a brand-new project (no id yet) — uploaded once creation succeeds.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
   const [deleteError, setDeleteError] = useState('')
+  const [docUploadWarning, setDocUploadWarning] = useState('')
 
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? '—'
-  const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
+  const companyNames = (ids: string[] = []) => ids.map(companyName).join(', ') || '—'
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return projects.filter(
       (p) =>
-        (!companyFilter || p.companyId === companyFilter) &&
-        (!yearFilter || p.financialYearId === yearFilter) &&
+        (!companyFilter || p.companyIds?.includes(companyFilter)) &&
         (!q ||
-          [p.name, p.category, p.location, p.description, companyName(p.companyId)].some((f) =>
+          [p.name, p.category, p.location, p.description, companyNames(p.companyIds)].some((f) =>
             (f ?? '').toLowerCase().includes(q),
           )),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projects, companyFilter, yearFilter, search, companies])
+  }, [projects, companyFilter, search, companies])
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['projects'] })
@@ -108,32 +116,46 @@ export default function Projects() {
     onError: (err) => setDeleteError(getErrorMessage(err, 'Could not delete project')),
   })
 
-  // Only active financial years can be chosen when adding. When editing, keep the
-  // record's own (possibly inactive) year as an option so existing data stays intact.
-  const activeYears = useMemo(() => years.filter((y) => y.isActive), [years])
-  const yearOptions = useMemo(() => {
-    if (form.financialYearId && !activeYears.some((y) => y.id === form.financialYearId)) {
-      const cur = years.find((y) => y.id === form.financialYearId)
-      if (cur) return [cur, ...activeYears]
-    }
-    return activeYears
-  }, [activeYears, years, form.financialYearId])
+  // Preview of the End Date the server will compute, from the FY the chosen
+  // Start Date falls into (Ongoing -> +3 years; Other than Ongoing -> +1 year).
+  // Not user-editable.
+  const endDatePreview = useMemo(
+    () => previewProjectEndDate(years, form.derivedStatus, form.startDate),
+    [years, form.derivedStatus, form.startDate],
+  )
+
+  function setDerivedStatus(derivedStatus: DerivedStatus) {
+    setForm((f) => ({ ...f, derivedStatus }))
+  }
+
+  function toggleCompany(id: string, checked: boolean) {
+    setForm((f) => ({
+      ...f,
+      companyIds: checked ? [...f.companyIds, id] : f.companyIds.filter((c) => c !== id),
+    }))
+  }
 
   function openAdd() {
     setEditing(null)
-    setForm({ ...emptyForm, companyId: companies[0]?.id ?? '', financialYearId: activeYears[0]?.id ?? '' })
+    setForm({ ...emptyForm, companyIds: companies[0] ? [companies[0].id] : [] })
+    setPendingFiles([])
     setFormError('')
     setOpen(true)
   }
   function openEdit(p: Project) {
     setEditing(p)
-    setForm({ ...emptyForm, ...p })
+    setForm({ ...emptyForm, ...p, companyIds: p.companyIds ?? [] })
+    setPendingFiles([])
     setFormError('')
     setOpen(true)
   }
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
+    if (form.companyIds.length === 0) {
+      setFormError('Select at least one company.')
+      return
+    }
     if (!form.startDate) {
       setFormError('Start date is required.')
       return
@@ -142,16 +164,31 @@ export default function Projects() {
       setFormError('Add a description or notes explaining why the project is On Hold or Cancelled.')
       return
     }
-    // An ongoing project has no fixed end date — clear it so the two never conflict.
+    // The End Date is always derived server-side.
     const payload = {
       ...form,
       budget: Number(form.budget),
-      endDate: form.ongoing ? '' : form.endDate,
     }
     try {
-      if (editing) await updateM.mutateAsync({ id: editing.id, data: payload })
-      else await createM.mutateAsync(payload)
+      if (editing) {
+        await updateM.mutateAsync({ id: editing.id, data: payload })
+      } else {
+        const created = await createM.mutateAsync(payload)
+        if (pendingFiles.length > 0) {
+          const results = await Promise.allSettled(
+            pendingFiles.map((file) => projectDocumentService.upload(created.id, file)),
+          )
+          const failed = results.filter((r) => r.status === 'rejected').length
+          if (failed > 0) {
+            setDocUploadWarning(
+              `Project created, but ${failed} of ${pendingFiles.length} document(s) failed to upload.`,
+            )
+          }
+          qc.invalidateQueries({ queryKey: ['project-documents', created.id] })
+        }
+      }
       setOpen(false)
+      setPendingFiles([])
     } catch (err) {
       setFormError(getErrorMessage(err))
     }
@@ -159,7 +196,7 @@ export default function Projects() {
 
   const period = (p: Project) => {
     const start = p.startDate ? formatDate(String(p.startDate)) : ''
-    if (p.ongoing) return start ? `${start} – Ongoing` : 'Ongoing'
+    if (p.derivedStatus === 'ongoing') return start ? `${start} – Ongoing` : 'Ongoing'
     return [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
   }
 
@@ -173,6 +210,9 @@ export default function Projects() {
       {deleteError && (
         <p className="mb-4 rounded-xl bg-danger/10 px-4 py-2.5 text-sm text-danger">{deleteError}</p>
       )}
+      {docUploadWarning && (
+        <p className="mb-4 rounded-xl bg-warning/10 px-4 py-2.5 text-sm text-warning">{docUploadWarning}</p>
+      )}
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
@@ -180,14 +220,6 @@ export default function Projects() {
           {companies.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
-            </option>
-          ))}
-        </Select>
-        <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-          <option value="">All Years</option>
-          {years.map((y) => (
-            <option key={y.id} value={y.id}>
-              {y.name}
             </option>
           ))}
         </Select>
@@ -201,17 +233,26 @@ export default function Projects() {
             className="flex items-start justify-between gap-4 rounded-2xl border border-line bg-surface px-5 py-4 shadow-sm transition-colors hover:bg-ink/[0.02]"
           >
             <div className="min-w-0">
+              <DocumentAttachments
+                parentId={p.id}
+                canWrite={canWrite}
+                allowUpload={false}
+                service={projectDocumentService}
+                queryKey="project-documents"
+              />
               <div className="mb-1 flex items-center gap-2">
                 <h3 className="font-semibold text-ink">{p.name}</h3>
                 <StatusBadge status={p.status} />
+                <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-muted">
+                  {p.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing'}
+                </span>
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                <span>Company: <span className="text-ink/80">{companyName(p.companyId)}</span></span>
-                <span>Year: <span className="text-ink/80">{yearName(p.financialYearId)}</span></span>
+                <span>Companies: <span className="text-ink/80">{companyNames(p.companyIds)}</span></span>
                 {p.category && <span>Category: <span className="text-ink/80">{p.category}</span></span>}
                 {p.location && <span>Location: <span className="text-ink/80">{p.location}</span></span>}
                 <span>Budget: <span className="text-ink/80">{formatINR(p.budget)}</span></span>
-                {(p.startDate || p.endDate || p.ongoing) && (
+                {(p.startDate || p.endDate) && (
                   <span>Period: <span className="text-ink/80">{period(p)}</span></span>
                 )}
               </div>
@@ -264,54 +305,74 @@ export default function Projects() {
           <Field label="Project Name">
             <TextInput required placeholder="Project name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
+          <Field label="Companies *">
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-line bg-surface/60 p-3">
+              {companies.length === 0 && <p className="text-sm text-muted">No companies yet.</p>}
+              {companies.map((c) => (
+                <Checkbox
+                  key={c.id}
+                  checked={form.companyIds.includes(c.id)}
+                  onChange={(v) => toggleCompany(c.id, v)}
+                  label={c.name}
+                />
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              How much each company contributes shows up automatically from its Fund Receipts against this project.
+            </p>
+          </Field>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Company">
-              <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
-                {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </FormSelect>
-            </Field>
-            <Field label="Financial Year">
-              <FormSelect required value={form.financialYearId} onChange={(e) => setForm({ ...form, financialYearId: e.target.value })}>
-                {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
-              </FormSelect>
-            </Field>
             <Field label="Status">
               <FormSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
                 {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </FormSelect>
+            </Field>
+            <Field label="Derived Status">
+              <FormSelect value={form.derivedStatus} onChange={(e) => setDerivedStatus(e.target.value as DerivedStatus)}>
+                <option value="ongoing">Ongoing</option>
+                <option value="other">Other than Ongoing</option>
               </FormSelect>
             </Field>
             <Field label="Approved Budget (₹)">
               <TextInput type="number" min={0} value={form.budget} onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })} />
             </Field>
             <Field label="Category">
-              <TextInput placeholder="e.g. Education, Healthcare" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+              <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                <option value="">Select category</option>
+                {categoryOptions.map((c) => <option key={c.id} value={c.value}>{c.value}</option>)}
+                {form.category && !categoryOptions.some((c) => c.value === form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
+              </FormSelect>
             </Field>
             <Field label="Location">
               <TextInput placeholder="City, State" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
             </Field>
             <Field label="Start Date *">
-              <DatePicker required value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
+              <DatePicker required maxDate="today" value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
             </Field>
-            <Field label="End Date">
-              <DatePicker
-                value={form.ongoing ? '' : form.endDate}
-                onChange={(iso) => setForm({ ...form, endDate: iso })}
-                disabled={form.ongoing}
-                placeholder={form.ongoing ? 'Ongoing — no end date' : 'Select date'}
-              />
+            <Field label="End Date (auto)">
+              <TextInput value={endDatePreview ? formatDate(endDatePreview) : '—'} readOnly disabled />
             </Field>
           </div>
-          <Checkbox
-            checked={form.ongoing}
-            onChange={(v) => setForm({ ...form, ongoing: v, endDate: v ? '' : form.endDate })}
-            label="Ongoing project"
-            hint="(still running — no fixed end date)"
-          />
           {REASON_REQUIRED.includes(form.status) && (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
               A description or notes entry is required for {form.status === 'on_hold' ? 'On Hold' : 'Cancelled'} projects.
             </p>
           )}
+          <Field label="Attach Document">
+            {editing ? (
+              <DocumentAttachments
+                parentId={editing.id}
+                canWrite={canWrite}
+                allowUpload
+                service={projectDocumentService}
+                queryKey="project-documents"
+              />
+            ) : (
+              <StagedAttachments files={pendingFiles} setFiles={setPendingFiles} />
+            )}
+          </Field>
           <Field label="Description">
             <TextArea rows={3} placeholder="Project description…" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
@@ -337,9 +398,20 @@ export default function Projects() {
         rows={
           viewing
             ? [
-                { label: 'Company', value: companyName(viewing.companyId) },
-                { label: 'Financial Year', value: yearName(viewing.financialYearId) },
+                { label: 'Companies', value: companyNames(viewing.companyIds) },
+                ...(() => {
+                  const contributions = contributionsForProject(viewing.id, receipts)
+                  return contributions.length > 0
+                    ? [{
+                        label: 'Contributions',
+                        value: contributions
+                          .map((c) => `${companyName(c.companyId)}: ${formatINR(c.amount)}`)
+                          .join(', '),
+                      }]
+                    : []
+                })(),
                 { label: 'Status', value: <StatusBadge status={viewing.status} /> },
+                { label: 'Derived Status', value: viewing.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
                 { label: 'Budget', value: formatINR(viewing.budget) },
                 { label: 'Category', value: viewing.category },
                 { label: 'Location', value: viewing.location },
@@ -371,3 +443,4 @@ export default function Projects() {
     </>
   )
 }
+

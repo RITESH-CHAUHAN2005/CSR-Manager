@@ -27,7 +27,9 @@ export const isProd = env.NODE_ENV === 'production'
 
 // Known production frontend(s) — always allowed for CORS regardless of the
 // CLIENT_ORIGIN env value, so a deploy keeps working without re-editing Render env.
-const PROD_FRONTENDS = ['https://firebrick-hedgehog-486591.hostingersite.com']
+// firebrick-hedgehog-486591 was the old Hostinger account's temp domain (plan
+// retired 2026-07-10); wheat-aardvark-709394 is the new Hostinger account's domain.
+const PROD_FRONTENDS = ['https://wheat-aardvark-709394.hostingersite.com']
 // Local dev origins (Vite). Only trusted when NOT in production.
 const DEV_FRONTENDS = ['http://localhost:5173', 'http://127.0.0.1:5173']
 

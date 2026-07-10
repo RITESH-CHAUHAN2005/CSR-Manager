@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { authenticate } from '../middleware/auth.js'
-import { requireWrite } from '../middleware/authorize.js'
 import {
   getCompanyPositions,
   getDashboard,
@@ -18,8 +17,8 @@ router.get('/dashboard/summary', getDashboard)
 router.get('/reports/year-wise', getYearWiseReport)
 router.get('/reports/company-positions', getCompanyPositions)
 
-// Exports — admin + editor (viewer is read-only and cannot export).
-router.get('/reports/export/excel', requireWrite, exportExcel)
-router.get('/reports/export/pdf', requireWrite, exportPdf)
+// Exports — every signed-in role, same visibility as the report data itself.
+router.get('/reports/export/excel', exportExcel)
+router.get('/reports/export/pdf', exportPdf)
 
 export default router

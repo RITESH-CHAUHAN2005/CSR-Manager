@@ -9,6 +9,9 @@ export interface IExpenditure extends Document {
   category: string
   approvedBy: string
   amount: number
+  // Only meaningful when the linked project is Ongoing — unused budget being
+  // carried forward, recorded at expenditure time (not on the project itself).
+  carryForwardAmount: number
   description?: string
   reference?: string
   notes?: string
@@ -23,6 +26,7 @@ const expenditureSchema = new Schema<IExpenditure>(
     category: { type: String, default: '', trim: true },
     approvedBy: { type: String, default: '', trim: true },
     amount: { type: Number, required: true, min: 0 },
+    carryForwardAmount: { type: Number, default: 0, min: 0 },
     description: { type: String, default: '', trim: true },
     reference: { type: String, default: '', trim: true },
     notes: { type: String, default: '', trim: true },

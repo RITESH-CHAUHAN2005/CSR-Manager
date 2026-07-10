@@ -4,6 +4,16 @@ const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid id')
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Expected YYYY-MM-DD date')
 const money = z.coerce.number().min(0)
 
+// Site-wide rule: Start Date and Receipt Date can never be in the future.
+const notFutureDate = (label: string, maxLen = 20) =>
+  z
+    .string()
+    .max(maxLen)
+    .regex(/^\d{4}-\d{2}-\d{2}/, 'Expected YYYY-MM-DD date')
+    .refine((d) => d.slice(0, 10) <= new Date().toISOString().slice(0, 10), {
+      message: `${label} cannot be a future date`,
+    })
+
 // Login no longer takes a role — the role is whatever the account has in the DB.
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -46,16 +56,19 @@ export const financialYearSchema = z.object({
 export const projectSchema = z
   .object({
     name: z.string().min(1).max(200),
-    companyId: objectId,
-    financialYearId: objectId,
+    companyIds: z.array(objectId).min(1, 'Select at least one company'),
     category: z.string().max(80).optional().default(''),
     location: z.string().max(160).optional().default(''),
     budget: money.optional().default(0),
     status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).default('active'),
-    ongoing: z.coerce.boolean().optional().default(false),
+    // Ongoing = end date auto-extends 4 years past the current FY; Other = end date
+    // is fixed to the current FY's end date. The end date itself is computed by
+    // middleware, not taken from the client. Carry-forward for an Ongoing project is
+    // recorded per-expenditure, not here.
+    derivedStatus: z.enum(['ongoing', 'other']).default('other'),
     description: z.string().max(2000).optional().default(''),
-    // Start date is mandatory; end date stays optional (blank when a project is ongoing).
-    startDate: z.string().min(1, 'Start date is required').max(20),
+    // Start date is mandatory and can never be in the future.
+    startDate: notFutureDate('Start date'),
     endDate: z.string().max(20).optional().default(''),
     notes: z.string().max(2000).optional().default(''),
   })
@@ -72,15 +85,43 @@ export const projectSchema = z
     },
   )
 
-export const fundReceiptSchema = z.object({
-  date: isoDate,
-  companyId: objectId,
-  financialYearId: objectId,
-  reference: z.string().max(120).optional().default(''),
-  mode: z.enum(['NEFT', 'RTGS', 'Cheque']),
-  carryForward: money.optional().default(0),
-  amount: money,
-  notes: z.string().max(2000).optional().default(''),
+export const fundReceiptSchema = z
+  .object({
+    date: notFutureDate('Receipt date'),
+    // 'company' = a donor company's contribution (Donor Company field); 'other_source'
+    // = income from a Master Data Source (Interest/SIP/FD…), not tied to a company.
+    receiptType: z.enum(['company', 'other_source']).default('company'),
+    companyId: z.union([objectId, z.literal('')]).optional().default(''),
+    source: z.string().max(80).optional().default(''),
+    financialYearId: objectId,
+    // Optional link to the project this receipt funds. Empty string -> undefined so
+    // Mongoose doesn't try to cast '' to an ObjectId.
+    projectId: z
+      .union([objectId, z.literal('')])
+      .optional()
+      .default('')
+      .transform((v) => v || undefined),
+    // "Account Number" in the UI.
+    reference: z.string().max(120).optional().default(''),
+    // No longer collected on the form; kept optional so historical records still validate.
+    mode: z.enum(['NEFT', 'RTGS', 'Cheque', '']).optional().default(''),
+    carryForward: money.optional().default(0),
+    amount: money,
+    notes: z.string().max(2000).optional().default(''),
+  })
+  .transform((d) => ({ ...d, companyId: d.companyId || undefined }))
+  .refine((d) => d.receiptType !== 'company' || Boolean(d.companyId), {
+    message: 'Donor Company is required for a company receipt',
+    path: ['companyId'],
+  })
+  .refine((d) => d.receiptType !== 'other_source' || Boolean(d.source?.trim()), {
+    message: 'Source is required for a receipt from another source',
+    path: ['source'],
+  })
+
+export const masterDataItemSchema = z.object({
+  type: z.enum(['category', 'status', 'source']),
+  value: z.string().min(1).max(80),
 })
 
 export const expenditureSchema = z.object({
@@ -91,6 +132,9 @@ export const expenditureSchema = z.object({
   category: z.string().max(80).optional().default(''),
   approvedBy: z.string().max(120).optional().default(''),
   amount: money,
+  // Only meaningful when the linked project is Ongoing — recorded here rather
+  // than on the project itself.
+  carryForwardAmount: money.optional().default(0),
   description: z.string().max(2000).optional().default(''),
   reference: z.string().max(120).optional().default(''),
   notes: z.string().max(2000).optional().default(''),

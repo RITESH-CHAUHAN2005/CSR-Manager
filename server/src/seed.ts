@@ -7,6 +7,7 @@ import { Project } from './models/Project.js'
 import { FundReceipt } from './models/FundReceipt.js'
 import { Expenditure } from './models/Expenditure.js'
 import { AuditLog } from './models/AuditLog.js'
+import { MasterDataItem } from './models/MasterDataItem.js'
 
 // Same dataset as the frontend mocks — totals match the reference images exactly.
 // Assumes an active mongoose connection (caller connects/disconnects).
@@ -20,6 +21,7 @@ export async function seedDatabase() {
     FundReceipt.deleteMany({}),
     Expenditure.deleteMany({}),
     AuditLog.deleteMany({}),
+    MasterDataItem.deleteMany({}),
   ])
 
   // --- Companies ---
@@ -48,13 +50,13 @@ export async function seedDatabase() {
 
   // --- Projects ---
   const [p1, p2, p3, p4, p5, p6, p7] = await Project.create([
-    { name: 'Digital Literacy Program', companyId: tcs._id, financialYearId: fy1._id, category: 'Education', location: 'Pune, Maharashtra', budget: 2500000, status: 'completed', description: 'Training rural youth in digital skills and computer usage' },
-    { name: 'Clean Water Initiative', companyId: tcs._id, financialYearId: fy2._id, category: 'Environment', location: 'Nagpur District', budget: 3500000, status: 'completed', description: 'Installation of water purification systems in 10 villages' },
-    { name: 'Women Empowerment Program', companyId: tcs._id, financialYearId: fy3._id, category: 'Skill Development', location: 'Nashik, Maharashtra', budget: 4000000, status: 'active', description: 'Skill development for rural women entrepreneurs' },
-    { name: 'BridgeIT Scholarship', companyId: infosys._id, financialYearId: fy2._id, category: 'Education', location: 'Bengaluru, Karnataka', budget: 1800000, status: 'completed', description: 'Scholarships for underprivileged students in STEM' },
-    { name: 'Rural Healthcare Camp', companyId: infosys._id, financialYearId: fy3._id, category: 'Healthcare', location: 'Mysuru District, Karnataka', budget: 2200000, status: 'active', description: 'Free healthcare services and medicine distribution' },
-    { name: 'Tree Plantation Drive', companyId: hdfc._id, financialYearId: fy2._id, category: 'Environment', location: 'Thane, Maharashtra', budget: 1000000, status: 'completed', description: 'Large-scale tree plantation and green cover initiative' },
-    { name: 'Old Age Care Center', companyId: hdfc._id, financialYearId: fy3._id, category: 'Healthcare', location: 'Mumbai, Maharashtra', budget: 2000000, status: 'active', description: 'Care and support center for senior citizens' },
+    { name: 'Digital Literacy Program', companyIds: [tcs._id], derivedStatus: 'other', startDate: '2022-04-15', endDate: fy1.endDate, category: 'Education', location: 'Pune, Maharashtra', budget: 2500000, status: 'completed', description: 'Training rural youth in digital skills and computer usage' },
+    { name: 'Clean Water Initiative', companyIds: [tcs._id], derivedStatus: 'other', startDate: '2023-05-10', endDate: fy2.endDate, category: 'Environment', location: 'Nagpur District', budget: 3500000, status: 'completed', description: 'Installation of water purification systems in 10 villages' },
+    { name: 'Women Empowerment Program', companyIds: [tcs._id], derivedStatus: 'ongoing', startDate: '2024-04-20', endDate: '2029-03-31', category: 'Skill Development', location: 'Nashik, Maharashtra', budget: 4000000, status: 'active', description: 'Skill development for rural women entrepreneurs' },
+    { name: 'BridgeIT Scholarship', companyIds: [infosys._id], derivedStatus: 'other', startDate: '2023-07-01', endDate: fy2.endDate, category: 'Education', location: 'Bengaluru, Karnataka', budget: 1800000, status: 'completed', description: 'Scholarships for underprivileged students in STEM' },
+    { name: 'Rural Healthcare Camp', companyIds: [infosys._id], derivedStatus: 'ongoing', startDate: '2024-06-10', endDate: '2029-03-31', category: 'Healthcare', location: 'Mysuru District, Karnataka', budget: 2200000, status: 'active', description: 'Free healthcare services and medicine distribution' },
+    { name: 'Tree Plantation Drive', companyIds: [hdfc._id], derivedStatus: 'other', startDate: '2023-08-05', endDate: fy2.endDate, category: 'Environment', location: 'Thane, Maharashtra', budget: 1000000, status: 'completed', description: 'Large-scale tree plantation and green cover initiative' },
+    { name: 'Old Age Care Center', companyIds: [hdfc._id], derivedStatus: 'ongoing', startDate: '2024-07-15', endDate: '2029-03-31', category: 'Healthcare', location: 'Mumbai, Maharashtra', budget: 2000000, status: 'active', description: 'Care and support center for senior citizens' },
   ])
 
   // --- Fund Receipts (total ₹1,78,00,000) ---
@@ -84,6 +86,23 @@ export async function seedDatabase() {
     { date: '2024-09-18', projectId: p5._id, companyId: infosys._id, financialYearId: fy3._id, category: 'Training', approvedBy: 'Executive Director', amount: 500000 },
     { date: '2024-10-05', projectId: p7._id, companyId: hdfc._id, financialYearId: fy3._id, category: 'Infrastructure', approvedBy: 'Trustee Board', amount: 1000000 },
     { date: '2024-11-28', projectId: p7._id, companyId: hdfc._id, financialYearId: fy3._id, category: 'Equipment', approvedBy: 'Trustee Board', amount: 700000 },
+  ])
+
+  // --- Master Data (dropdown lists used on Projects/Expenditures/Fund Receipts) ---
+  await MasterDataItem.create([
+    { type: 'category', value: 'Education' },
+    { type: 'category', value: 'Environment' },
+    { type: 'category', value: 'Skill Development' },
+    { type: 'category', value: 'Healthcare' },
+    { type: 'category', value: 'Infrastructure' },
+    { type: 'category', value: 'Women Empowerment' },
+    { type: 'category', value: 'Rural Development' },
+    { type: 'status', value: 'Active' },
+    { type: 'status', value: 'Not Active' },
+    { type: 'source', value: 'Interest' },
+    { type: 'source', value: 'SIP' },
+    { type: 'source', value: 'FD' },
+    { type: 'source', value: 'Bank Deposit' },
   ])
 
   console.log('✅ Seed complete (sample data + admin only):')

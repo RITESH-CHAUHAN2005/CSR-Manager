@@ -24,7 +24,9 @@ export function DataTable<T = unknown>({
   columns,
   slots,
   options,
-  className = 'display nowrap',
+  // Full grid (horizontal + vertical lines) is the site-wide default so every
+  // table reads as clean tabular data, not just row separators.
+  className = 'display nowrap csr-dt-grid',
 }: {
   data: T[]
   columns: DTColumn[]

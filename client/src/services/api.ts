@@ -6,8 +6,8 @@ import axios from 'axios'
 // Base URL resolution:
 //  - Dev: leave VITE_API_URL unset -> baseURL '/api', which Vite proxies to
 //    http://localhost:5000 (see vite.config.ts).
-//  - Split-domain prod (e.g. frontend on static host, backend on Railway):
-//    set VITE_API_URL to the backend origin, e.g. https://xxx.up.railway.app
+//  - Split-domain prod (frontend on Hostinger, backend on Render):
+//    set VITE_API_URL to the backend origin, e.g. https://csr-manager.onrender.com
 //    The '/api' suffix is appended automatically.
 const apiOrigin = import.meta.env.VITE_API_URL?.replace(/\/+$/, '')
 export const api = axios.create({

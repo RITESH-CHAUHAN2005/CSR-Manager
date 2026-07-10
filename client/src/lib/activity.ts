@@ -33,22 +33,26 @@ const FIELD_LABELS: Record<string, string> = {
   endDate: 'End Date',
   isActive: 'Active',
   company: 'Company',
+  companyIds: 'Companies',
   financialYear: 'Financial Year',
   project: 'Project',
   category: 'Category',
   location: 'Location',
   budget: 'Budget',
   status: 'Status',
+  derivedStatus: 'Derived Status',
+  carryForwardEnabled: 'Carry Forward',
+  carryForwardAmount: 'Carry Forward Amount',
   description: 'Description',
   date: 'Date',
-  reference: 'Reference',
+  reference: 'Account Number',
   mode: 'Payment Mode',
   carryForward: 'Carry Forward',
   amount: 'Amount',
   approvedBy: 'Approved By',
 }
 
-const MONEY_FIELDS = new Set(['amount', 'budget', 'carryForward'])
+const MONEY_FIELDS = new Set(['amount', 'budget', 'carryForward', 'carryForwardAmount'])
 const DATE_FIELDS = new Set(['date', 'startDate', 'endDate'])
 
 function titleCase(key: string): string {
@@ -64,6 +68,8 @@ export function fieldLabel(key: string): string {
 
 export function formatValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
   if (MONEY_FIELDS.has(field)) {
     const n = Number(value)
     if (!Number.isNaN(n)) return formatINR(n)
@@ -74,7 +80,6 @@ export function formatValue(field: string, value: unknown): string {
       return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     }
   }
-  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
   return String(value)
 }
 

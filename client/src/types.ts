@@ -81,35 +81,80 @@ export interface FinancialYear {
 }
 
 export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
+// Ongoing = still running; end date auto-extends 4 years past the current FY.
+// Other = end date is fixed to the current FY's end date.
+export type DerivedStatus = 'ongoing' | 'other'
 
 export interface Project extends CreatedBy {
   id: string
   name: string
-  companyId: string
-  financialYearId: string
+  companyIds: string[]
   category: string // Education, Environment, Skill Development, Healthcare...
   location: string
   budget: number
   status: ProjectStatus
-  ongoing?: boolean // still running, no fixed end date
+  derivedStatus: DerivedStatus
   description: string
   startDate?: string
-  endDate?: string
+  endDate?: string // computed server-side, not user-editable
   notes?: string
 }
 
-export type PaymentMode = 'NEFT' | 'RTGS' | 'Cheque'
+export type PaymentMode = 'NEFT' | 'RTGS' | 'Cheque' | ''
+
+// 'company' = a Donor Company's contribution; 'other_source' = income from a
+// Master Data Source (Interest/SIP/FD…), not tied to a donor company.
+export type FundReceiptType = 'company' | 'other_source'
 
 export interface FundReceipt extends CreatedBy {
   id: string
   date: string // ISO yyyy-mm-dd
-  companyId: string
+  receiptType: FundReceiptType
+  companyId?: string // labeled "Donor Company" in the UI — set when receiptType is 'company'
+  source?: string // Master Data "source" value — set when receiptType is 'other_source'
   financialYearId: string
-  reference: string // TCS/CSR/2022-23/001
-  mode: PaymentMode
-  carryForward: number
+  projectId?: string // optional link to the project this receipt funds
+  reference: string // now labeled "Account Number" in the UI
+  mode?: PaymentMode // no longer collected on the form; kept for historical records
+  carryForward?: number // no longer collected on the form; kept for historical records
   amount: number
   notes?: string
+}
+
+// ---- Master Data (Category / Status / Source) ----
+
+export type MasterDataType = 'category' | 'status' | 'source'
+
+export interface MasterDataItem {
+  id: string
+  type: MasterDataType
+  value: string
+}
+
+// ---- Project document attachments (metadata only — bytes fetched via download URL) ----
+
+export interface ProjectDocumentMeta {
+  id: string
+  projectId: string
+  filename: string
+  mimeType: string
+  size: number
+  uploadedByName?: string
+  uploadedByEmail?: string
+  createdAt?: string
+}
+
+// ---- Expenditure document attachments (metadata only — bytes fetched via download URL) ----
+
+export interface ExpenditureDocumentMeta {
+  id: string
+  expenditureId: string
+  filename: string
+  mimeType: string
+  size: number
+  uploadedByName?: string
+  uploadedByEmail?: string
+  createdAt?: string
 }
 
 export interface Expenditure extends CreatedBy {
@@ -121,6 +166,9 @@ export interface Expenditure extends CreatedBy {
   category: string // Infrastructure, Training, Equipment, Scholarships, Environment...
   approvedBy: string // Trustee Board, Executive Director...
   amount: number
+  // Only meaningful when the linked project is Ongoing — unused budget being
+  // carried forward, recorded here rather than on the project itself.
+  carryForwardAmount?: number
   description?: string
   reference?: string
   notes?: string

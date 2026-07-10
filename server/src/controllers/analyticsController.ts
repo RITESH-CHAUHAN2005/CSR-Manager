@@ -13,7 +13,7 @@ const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 async function loadAll() {
   const [companies, years, projects, receipts, expenditures] = await Promise.all([
     Company.find().sort({ createdAt: 1 }),
-    FinancialYear.find().sort({ createdAt: 1 }),
+    FinancialYear.find().sort({ startDate: 1 }),
     Project.find(),
     FundReceipt.find(),
     Expenditure.find(),
@@ -25,12 +25,14 @@ function companyPositions(d: Awaited<ReturnType<typeof loadAll>>) {
   return d.companies.map((c) => {
     const id = String(c._id)
     const received = sum(d.receipts.filter((r) => String(r.companyId) === id).map((r) => r.amount))
-    const carryForward = sum(
-      d.receipts.filter((r) => String(r.companyId) === id).map((r) => r.carryForward),
-    )
-    const expenditure = sum(
-      d.expenditures.filter((e) => String(e.companyId) === id).map((e) => e.amount),
-    )
+    const myProjects = d.projects.filter((p) => p.companyIds.some((cid) => String(cid) === id))
+    const myExpenditures = d.expenditures.filter((e) => String(e.companyId) === id)
+    // Carry Forward = legacy receipt-level carry-in + unused budget carried forward,
+    // recorded per-expenditure against this company's Ongoing projects.
+    const carryForward =
+      sum(d.receipts.filter((r) => String(r.companyId) === id).map((r) => r.carryForward)) +
+      sum(myExpenditures.map((e) => e.carryForwardAmount))
+    const expenditure = sum(myExpenditures.map((e) => e.amount))
     return {
       companyId: id,
       companyName: c.name,
@@ -38,7 +40,7 @@ function companyPositions(d: Awaited<ReturnType<typeof loadAll>>) {
       carryForward,
       expenditure,
       balance: received + carryForward - expenditure,
-      projects: d.projects.filter((p) => String(p.companyId) === id).length,
+      projects: myProjects.length,
     }
   })
 }

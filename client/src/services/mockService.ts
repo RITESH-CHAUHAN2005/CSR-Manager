@@ -13,9 +13,12 @@ import type {
   CompanyFundPosition,
   DashboardSummary,
   Expenditure,
+  ExpenditureDocumentMeta,
   FinancialYear,
   FundReceipt,
+  MasterDataItem,
   Project,
+  ProjectDocumentMeta,
   YearFundFlow,
 } from '../types'
 import {
@@ -36,6 +39,26 @@ let expenditures = clone(seedExpenditures)
 
 let idCounter = 1000
 const nextId = (prefix: string) => `${prefix}${idCounter++}`
+
+let masterDataItems: MasterDataItem[] = [
+  { id: 'md1', type: 'category', value: 'Education' },
+  { id: 'md2', type: 'category', value: 'Environment' },
+  { id: 'md3', type: 'category', value: 'Skill Development' },
+  { id: 'md4', type: 'category', value: 'Healthcare' },
+  { id: 'md5', type: 'status', value: 'Active' },
+  { id: 'md6', type: 'status', value: 'Not Active' },
+  { id: 'md7', type: 'source', value: 'Interest' },
+  { id: 'md8', type: 'source', value: 'SIP' },
+  { id: 'md9', type: 'source', value: 'FD' },
+  { id: 'md10', type: 'category', value: 'Infrastructure' },
+  { id: 'md11', type: 'category', value: 'Women Empowerment' },
+  { id: 'md12', type: 'category', value: 'Rural Development' },
+  { id: 'md13', type: 'source', value: 'Bank Deposit' },
+]
+
+// Documents are held only for the current session (object URLs), since there's no
+// real backend in mock mode.
+let projectDocuments: (ProjectDocumentMeta & { url: string })[] = []
 
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
 
@@ -149,10 +172,12 @@ export const expenditureService = {
 function companyPositions(): CompanyFundPosition[] {
   return companies.map((c) => {
     const received = sum(fundReceipts.filter((r) => r.companyId === c.id).map((r) => r.amount))
-    const carryForward = sum(
-      fundReceipts.filter((r) => r.companyId === c.id).map((r) => r.carryForward),
-    )
-    const expenditure = sum(expenditures.filter((e) => e.companyId === c.id).map((e) => e.amount))
+    const myProjects = projects.filter((p) => p.companyIds?.includes(c.id))
+    const myExpenditures = expenditures.filter((e) => e.companyId === c.id)
+    const carryForward =
+      sum(fundReceipts.filter((r) => r.companyId === c.id).map((r) => r.carryForward ?? 0)) +
+      sum(myExpenditures.map((e) => e.carryForwardAmount ?? 0))
+    const expenditure = sum(myExpenditures.map((e) => e.amount))
     return {
       companyId: c.id,
       companyName: c.name,
@@ -160,7 +185,7 @@ function companyPositions(): CompanyFundPosition[] {
       carryForward,
       expenditure,
       balance: received + carryForward - expenditure,
-      projects: projects.filter((p) => p.companyId === c.id).length,
+      projects: myProjects.length,
     }
   })
 }
@@ -219,7 +244,7 @@ export const analyticsService = {
         fundReceipts.filter((r) => r.financialYearId === fy.id).map((r) => r.amount),
       )
       const carryForwardIn = sum(
-        fundReceipts.filter((r) => r.financialYearId === fy.id).map((r) => r.carryForward),
+        fundReceipts.filter((r) => r.financialYearId === fy.id).map((r) => r.carryForward ?? 0),
       )
       const expenditure = sum(
         expenditures.filter((e) => e.financialYearId === fy.id).map((e) => e.amount),
@@ -243,8 +268,87 @@ export const analyticsService = {
   companyPositions: () => delay(companyPositions()),
 
   // Server-rendered PDF/Excel isn't available in standalone mock mode; callers fall back.
-  exportReport: (_type: 'year' | 'company' | 'project', _format: 'pdf' | 'excel'): Promise<Blob> =>
+  exportReport: (
+    _type: 'year' | 'company' | 'project' | 'carryForward' | 'ledger',
+    _format: 'pdf' | 'excel',
+  ): Promise<Blob> =>
     Promise.reject(new Error('Server export unavailable in offline mode')),
+}
+
+// ---------------- Master Data (Category / Status / Source) ----------------
+export const masterDataService = {
+  list: () => delay(clone(masterDataItems)),
+  create: (data: Omit<MasterDataItem, 'id'>) => {
+    const item = { ...data, id: nextId('md') }
+    masterDataItems.push(item)
+    return delay(item)
+  },
+  update: (id: string, data: Partial<MasterDataItem>) => {
+    masterDataItems = masterDataItems.map((m) => (m.id === id ? { ...m, ...data } : m))
+    return delay(masterDataItems.find((m) => m.id === id)!)
+  },
+  remove: (id: string) => {
+    masterDataItems = masterDataItems.filter((m) => m.id !== id)
+    return delay({ id })
+  },
+}
+
+// ---------------- Project documents (session-only, no real backend) ----------------
+export const projectDocumentService = {
+  list: (projectId: string): Promise<ProjectDocumentMeta[]> =>
+    delay(projectDocuments.filter((d) => d.projectId === projectId).map(({ url: _url, ...meta }) => meta)),
+  upload: (projectId: string, file: File): Promise<ProjectDocumentMeta> => {
+    const meta = {
+      id: nextId('doc'),
+      projectId,
+      filename: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      url: URL.createObjectURL(file),
+    }
+    projectDocuments.push(meta)
+    const { url: _url, ...rest } = meta
+    return delay(rest)
+  },
+  remove: (projectId: string, docId: string) => {
+    projectDocuments = projectDocuments.filter((d) => !(d.projectId === projectId && d.id === docId))
+    return delay({ id: docId })
+  },
+  downloadUrl: (_projectId: string, docId: string) =>
+    projectDocuments.find((d) => d.id === docId)?.url ?? '#',
+}
+
+// ---------------- Expenditure documents (session-only, no real backend) ----------------
+let expenditureDocuments: (ExpenditureDocumentMeta & { url: string })[] = []
+
+export const expenditureDocumentService = {
+  list: (expenditureId: string): Promise<ExpenditureDocumentMeta[]> =>
+    delay(
+      expenditureDocuments
+        .filter((d) => d.expenditureId === expenditureId)
+        .map(({ url: _url, ...meta }) => meta),
+    ),
+  upload: (expenditureId: string, file: File): Promise<ExpenditureDocumentMeta> => {
+    const meta = {
+      id: nextId('doc'),
+      expenditureId,
+      filename: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      url: URL.createObjectURL(file),
+    }
+    expenditureDocuments.push(meta)
+    const { url: _url, ...rest } = meta
+    return delay(rest)
+  },
+  remove: (expenditureId: string, docId: string) => {
+    expenditureDocuments = expenditureDocuments.filter(
+      (d) => !(d.expenditureId === expenditureId && d.id === docId),
+    )
+    return delay({ id: docId })
+  },
+  downloadUrl: (_expenditureId: string, docId: string) =>
+    expenditureDocuments.find((d) => d.id === docId)?.url ?? '#',
 }
 
 // --- Mock stubs for admin users + logs (only meaningful with the live API) ---

@@ -7,6 +7,7 @@ import { Project } from '../models/Project.js'
 import { FinancialYear } from '../models/FinancialYear.js'
 import { FundReceipt } from '../models/FundReceipt.js'
 import { Expenditure } from '../models/Expenditure.js'
+import { findCurrentFinancialYear } from '../utils/financialYear.js'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const inr = (n: number) =>
@@ -30,7 +31,7 @@ interface ReportSpec {
 
 async function yearReport(): Promise<ReportSpec> {
   const [years, receipts, expenditures] = await Promise.all([
-    FinancialYear.find().sort({ createdAt: 1 }),
+    FinancialYear.find().sort({ startDate: 1 }),
     FundReceipt.find(),
     Expenditure.find(),
   ])
@@ -71,10 +72,13 @@ async function companyReport(): Promise<ReportSpec> {
   const rows = companies.map((c) => {
     const id = String(c._id)
     const received = sum(receipts.filter((r) => String(r.companyId) === id).map((r) => r.amount))
-    const carry = sum(receipts.filter((r) => String(r.companyId) === id).map((r) => r.carryForward))
-    const expenditure = sum(expenditures.filter((e) => String(e.companyId) === id).map((e) => e.amount))
-    const projectCount = projects.filter((p) => String(p.companyId) === id).length
-    return [c.name, received, carry, expenditure, received + carry - expenditure, projectCount]
+    const myProjects = projects.filter((p) => p.companyIds.some((cid) => String(cid) === id))
+    const myExpenditures = expenditures.filter((e) => String(e.companyId) === id)
+    const carry =
+      sum(receipts.filter((r) => String(r.companyId) === id).map((r) => r.carryForward)) +
+      sum(myExpenditures.map((e) => e.carryForwardAmount))
+    const expenditure = sum(myExpenditures.map((e) => e.amount))
+    return [c.name, received, carry, expenditure, received + carry - expenditure, myProjects.length]
   })
   const col = (i: number) => sum(rows.map((r) => Number(r[i])))
   return {
@@ -94,27 +98,28 @@ async function companyReport(): Promise<ReportSpec> {
 }
 
 async function projectReport(): Promise<ReportSpec> {
-  const [projects, companies, years, expenditures] = await Promise.all([
+  const [projects, companies, expenditures] = await Promise.all([
     Project.find().sort({ createdAt: 1 }),
     Company.find(),
-    FinancialYear.find(),
     Expenditure.find(),
   ])
   const rows = projects.map((p) => {
     const id = String(p._id)
     const spent = sum(expenditures.filter((e) => String(e.projectId) === id).map((e) => e.amount))
-    const company = companies.find((c) => String(c._id) === String(p.companyId))?.name ?? '—'
-    const year = years.find((y) => String(y._id) === String(p.financialYearId))?.name ?? '—'
+    const companyNames =
+      companies
+        .filter((c) => p.companyIds.some((cid) => String(cid) === String(c._id)))
+        .map((c) => c.name)
+        .join(', ') || '—'
     const utilization = p.budget ? Math.round((spent / p.budget) * 100) : 0
-    return [p.name, company, year, p.budget, spent, utilization, p.status]
+    return [p.name, companyNames, p.budget, spent, utilization, p.status]
   })
   return {
     title: 'Project-wise Financial Report',
     filename: 'project-wise-report',
     columns: [
       { header: 'Project', width: 150, kind: 'text' },
-      { header: 'Company', width: 120, kind: 'text' },
-      { header: 'Year', width: 90, kind: 'text' },
+      { header: 'Company', width: 160, kind: 'text' },
       { header: 'Budget', width: 105, kind: 'money' },
       { header: 'Spent', width: 105, kind: 'money' },
       { header: 'Utilization', width: 90, kind: 'percent' },
@@ -124,9 +129,126 @@ async function projectReport(): Promise<ReportSpec> {
   }
 }
 
+async function carryForwardReport(): Promise<ReportSpec> {
+  const [projects, companies, expenditures, receipts, years] = await Promise.all([
+    Project.find().sort({ createdAt: 1 }),
+    Company.find(),
+    Expenditure.find(),
+    FundReceipt.find(),
+    FinancialYear.find(),
+  ])
+  const currentFy = findCurrentFinancialYear(years)
+  const nextFy = currentFy
+    ? [...years]
+        .filter((y) => y.startDate > currentFy.endDate)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
+    : undefined
+  const rollsInto = nextFy?.name ?? '—'
+
+  const rows: (string | number)[][] = []
+  projects
+    .filter((p) => p.derivedStatus === 'ongoing')
+    .forEach((p) => {
+      const id = String(p._id)
+      const projectCF = sum(expenditures.filter((e) => String(e.projectId) === id).map((e) => e.carryForwardAmount))
+      if (projectCF <= 0) return
+      // Derived from actual Fund Receipts against this project, not a manually
+      // entered figure — the single source of truth for "who put in how much".
+      const contributionTotals = new Map<string, number>()
+      receipts
+        .filter((r) => String(r.projectId) === id && r.receiptType === 'company' && r.companyId)
+        .forEach((r) => {
+          const key = String(r.companyId)
+          contributionTotals.set(key, (contributionTotals.get(key) ?? 0) + r.amount)
+        })
+      const totalContrib = sum([...contributionTotals.values()])
+      if (totalContrib <= 0) {
+        rows.push([p.name, 'Unattributed', 0, projectCF, rollsInto])
+        return
+      }
+      contributionTotals.forEach((amount, companyId) => {
+        const companyName = companies.find((co) => String(co._id) === companyId)?.name ?? '—'
+        const pct = Math.round((amount / totalContrib) * 100)
+        const share = projectCF * (amount / totalContrib)
+        rows.push([p.name, companyName, pct, share, rollsInto])
+      })
+    })
+
+  return {
+    title: 'Project Carry Forward Report',
+    filename: 'carry-forward-report',
+    columns: [
+      { header: 'Project', width: 150, kind: 'text' },
+      { header: 'Company', width: 160, kind: 'text' },
+      { header: 'Contribution %', width: 100, kind: 'percent' },
+      { header: 'Carry Forward Share', width: 120, kind: 'money' },
+      { header: 'Rolls Into', width: 100, kind: 'text' },
+    ],
+    rows,
+  }
+}
+
+async function ledgerReport(): Promise<ReportSpec> {
+  const [receipts, expenditures, companies, projects, years] = await Promise.all([
+    FundReceipt.find(),
+    Expenditure.find(),
+    Company.find(),
+    Project.find(),
+    FinancialYear.find(),
+  ])
+  const companyName = (id: unknown) => companies.find((c) => String(c._id) === String(id))?.name ?? '—'
+  const projectName = (id: unknown) => (id ? projects.find((p) => String(p._id) === String(id))?.name ?? '—' : '—')
+  const yearName = (id: unknown) => years.find((y) => String(y._id) === String(id))?.name ?? '—'
+
+  const merged = [
+    ...receipts.map((r) => ({
+      type: 'Receipt',
+      date: r.date,
+      company: r.receiptType === 'other_source' ? r.source || 'Other Source' : companyName(r.companyId),
+      project: projectName(r.projectId),
+      fy: yearName(r.financialYearId),
+      base: r.amount,
+      carry: r.carryForward ?? 0,
+    })),
+    ...expenditures.map((e) => ({
+      type: 'Expenditure',
+      date: e.date,
+      company: companyName(e.companyId),
+      project: projectName(e.projectId),
+      fy: yearName(e.financialYearId),
+      base: e.amount,
+      carry: e.carryForwardAmount ?? 0,
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
+
+  let running = 0
+  const rows = merged.map((r) => {
+    running += r.type === 'Receipt' ? r.base : -r.base
+    return [r.type, r.date, r.company, r.project, r.fy, r.base, r.carry, running]
+  })
+
+  return {
+    title: 'Master Transaction Ledger',
+    filename: 'transaction-ledger',
+    columns: [
+      { header: 'Type', width: 90, kind: 'text' },
+      { header: 'Date', width: 90, kind: 'text' },
+      { header: 'Company', width: 150, kind: 'text' },
+      { header: 'Project', width: 150, kind: 'text' },
+      { header: 'FY', width: 90, kind: 'text' },
+      { header: 'Base Amount', width: 105, kind: 'money' },
+      { header: 'Carry Forward', width: 105, kind: 'money' },
+      { header: 'Total Balance', width: 105, kind: 'money' },
+    ],
+    rows,
+  }
+}
+
 async function buildReport(type: string): Promise<ReportSpec> {
   if (type === 'company') return companyReport()
   if (type === 'project') return projectReport()
+  if (type === 'carryForward') return carryForwardReport()
+  if (type === 'ledger') return ledgerReport()
   return yearReport()
 }
 

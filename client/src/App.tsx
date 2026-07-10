@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Companies = lazy(() => import('./pages/Companies'))
 const CompanyDetail = lazy(() => import('./pages/CompanyDetail'))
 const FinancialYears = lazy(() => import('./pages/FinancialYears'))
+const MasterData = lazy(() => import('./pages/MasterData'))
 const Projects = lazy(() => import('./pages/Projects'))
 const FundReceipts = lazy(() => import('./pages/FundReceipts'))
 const Expenditures = lazy(() => import('./pages/Expenditures'))
@@ -73,6 +74,15 @@ export default function App() {
         <Route path="/companies" element={<Companies />} />
         <Route path="/companies/:id" element={<CompanyDetail />} />
         <Route path="/financial-years" element={<FinancialYears />} />
+        {/* Master Data — admin + editor only; viewer has no reason to manage dropdown lists */}
+        <Route
+          path="/master-data"
+          element={
+            <RequireRole allow={['admin', 'editor']}>
+              <MasterData />
+            </RequireRole>
+          }
+        />
         <Route path="/projects" element={<Projects />} />
         <Route path="/fund-receipts" element={<FundReceipts />} />
         <Route path="/expenditures" element={<Expenditures />} />

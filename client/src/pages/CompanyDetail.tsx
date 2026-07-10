@@ -14,7 +14,6 @@ import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import type { Company, Project } from '../types'
 import {
-  Card,
   DetailModal,
   Field,
   Modal,
@@ -43,29 +42,40 @@ export default function CompanyDetail() {
   const company = companies.find((c) => c.id === id)
 
   const yearName = (fyId: string) => years.find((y) => y.id === fyId)?.name ?? '—'
+  const companyNames = (ids: string[]) =>
+    ids.map((cid) => companies.find((c) => c.id === cid)?.name ?? '—').join(', ') || '—'
 
   // Per-company slices.
   const myReceipts = useMemo(() => receipts.filter((r) => r.companyId === id), [receipts, id])
   const myExpenditures = useMemo(() => expenditures.filter((e) => e.companyId === id), [expenditures, id])
-  const myProjects = useMemo(() => projects.filter((p) => p.companyId === id), [projects, id])
+  const myProjects = useMemo(() => projects.filter((p) => p.companyIds?.includes(id)), [projects, id])
 
-  // Fund overview totals.
+  // Fund overview totals — Carry Forward = legacy receipt carry-in + unused
+  // budget carried forward, recorded per-expenditure against Ongoing projects.
   const totalReceived = sum(myReceipts.map((r) => r.amount))
-  const carryForward = sum(myReceipts.map((r) => r.carryForward))
+  const carryForward =
+    sum(myReceipts.map((r) => r.carryForward ?? 0)) +
+    sum(myExpenditures.map((e) => e.carryForwardAmount ?? 0))
+  const totalExpenditure = sum(myExpenditures.map((e) => e.amount))
+  const currentBalance = totalReceived + carryForward - totalExpenditure
   const activeProjects = myProjects.filter((p) => p.status === 'active').length
 
   // Year-wise fund summary — only years where this company has any activity.
+  // Projects no longer carry a financial year, so "has a project" is based on
+  // whether the project's start date falls inside the year's date range.
   const yearRows = useMemo(() => {
     return years
       .map((y) => {
         const received = sum(myReceipts.filter((r) => r.financialYearId === y.id).map((r) => r.amount))
         const carryForwardIn = sum(
-          myReceipts.filter((r) => r.financialYearId === y.id).map((r) => r.carryForward),
+          myReceipts.filter((r) => r.financialYearId === y.id).map((r) => r.carryForward ?? 0),
         )
         const expenditure = sum(
           myExpenditures.filter((e) => e.financialYearId === y.id).map((e) => e.amount),
         )
-        const hasProject = myProjects.some((p) => p.financialYearId === y.id)
+        const hasProject = myProjects.some(
+          (p) => p.startDate && p.startDate >= y.startDate && p.startDate <= y.endDate,
+        )
         const balance = received + carryForwardIn - expenditure
         return { id: y.id, name: y.name, received, carryForwardIn, expenditure, balance, hasProject }
       })
@@ -81,9 +91,19 @@ export default function CompanyDetail() {
     [myReceipts, years],
   )
 
+  const projectRows = useMemo(
+    () =>
+      myProjects.map((p) => ({
+        ...p,
+        companyNames: companyNames(p.companyIds ?? []),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [myProjects, companies],
+  )
+
   const projectPeriod = (p: Project) => {
     const start = p.startDate ? formatDate(String(p.startDate)) : ''
-    if (p.ongoing) return start ? `${start} – Ongoing` : 'Ongoing'
+    if (p.derivedStatus === 'ongoing') return start ? `${start} – Ongoing` : 'Ongoing'
     return [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
   }
 
@@ -167,127 +187,150 @@ export default function CompanyDetail() {
         )}
       </div>
 
-      {/* Contact + Fund overview */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-ink">Contact Information</h2>
-          <div className="space-y-3 text-sm text-ink/80">
-            {company.contactPerson && (
-              <p className="flex items-center gap-3"><User size={16} className="text-muted" /> {company.contactPerson}</p>
-            )}
-            {company.email && (
-              <p className="flex items-center gap-3"><Mail size={16} className="text-muted" /> {company.email}</p>
-            )}
-            {company.phone && (
-              <p className="flex items-center gap-3"><Phone size={16} className="text-muted" /> {company.phone}</p>
-            )}
-            {company.address && (
-              <p className="flex items-start gap-3"><MapPin size={16} className="mt-0.5 shrink-0 text-muted" /> {company.address}</p>
-            )}
-            {!company.contactPerson && !company.email && !company.phone && !company.address && (
-              <p className="text-muted">No contact details on file.</p>
-            )}
-            {company.notes && (
-              <p className="mt-2 border-t border-line/60 pt-3 text-muted">{company.notes}</p>
-            )}
+      {/* Contact + Fund overview + Year-wise summary + Projects + Fund receipts —
+          one flat, borderless surface divided by rule lines (no nested card boxes). */}
+      <div className="divide-y divide-line/70 rounded-2xl border border-line/70">
+        <div className="grid grid-cols-1 divide-y divide-line/70 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+          <div className="p-6">
+            <h2 className="mb-4 text-lg font-semibold text-ink">Contact Information</h2>
+            <div className="space-y-3 text-sm text-ink/80">
+              {company.contactPerson && (
+                <p className="flex items-center gap-3"><User size={16} className="text-muted" /> {company.contactPerson}</p>
+              )}
+              {company.email && (
+                <p className="flex items-center gap-3"><Mail size={16} className="text-muted" /> {company.email}</p>
+              )}
+              {company.phone && (
+                <p className="flex items-center gap-3"><Phone size={16} className="text-muted" /> {company.phone}</p>
+              )}
+              {company.address && (
+                <p className="flex items-start gap-3"><MapPin size={16} className="mt-0.5 shrink-0 text-muted" /> {company.address}</p>
+              )}
+              {!company.contactPerson && !company.email && !company.phone && !company.address && (
+                <p className="text-muted">No contact details on file.</p>
+              )}
+              {company.notes && (
+                <p className="mt-2 border-t border-line/60 pt-3 text-muted">{company.notes}</p>
+              )}
+            </div>
           </div>
-        </Card>
 
-        <Card className="p-6">
-          <h2 className="mb-4 text-lg font-semibold text-ink">Fund Overview</h2>
-          <div className="grid grid-cols-2 gap-3">
-            <OverviewStat label="Total Received" value={formatINR(totalReceived)} />
-            <OverviewStat label="Carry Forward" value={formatINR(carryForward)} />
-            <OverviewStat label="Total Projects" value={String(myProjects.length)} />
-            <OverviewStat label="Active Projects" value={String(activeProjects)} />
+          <div className="p-6">
+            <h2 className="mb-4 text-lg font-semibold text-ink">Fund Overview</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border border-line/60 text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="border-b border-r border-line/60 px-3 py-2 font-medium">Total Received</th>
+                    <th className="border-b border-r border-line/60 px-3 py-2 font-medium">Carry Forward</th>
+                    <th className="border-b border-r border-line/60 px-3 py-2 font-medium">Total Expenditure</th>
+                    <th className="border-b border-r border-line/60 px-3 py-2 font-medium">Current Balance</th>
+                    <th className="border-b border-r border-line/60 px-3 py-2 font-medium">Total Projects</th>
+                    <th className="border-b border-line/60 px-3 py-2 font-medium">Active Projects</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border-r border-line/60 px-3 py-3 font-semibold text-ink">{formatINR(totalReceived)}</td>
+                    <td className="border-r border-line/60 px-3 py-3 font-semibold text-ink">{formatINR(carryForward)}</td>
+                    <td className="border-r border-line/60 px-3 py-3 font-semibold text-danger">{formatINR(totalExpenditure)}</td>
+                    <td className="border-r border-line/60 px-3 py-3 font-semibold text-success">{formatINR(currentBalance)}</td>
+                    <td className="border-r border-line/60 px-3 py-3 font-semibold text-ink">{myProjects.length}</td>
+                    <td className="px-3 py-3 font-semibold text-success">{activeProjects}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </Card>
-      </div>
+        </div>
 
-      {/* Year-wise fund summary */}
-      <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-ink">Year-wise Fund Summary</h2>
-        {yearRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">No fund activity recorded yet.</p>
-        ) : (
-          <DataTable
-            data={yearRows}
-            columns={[
-              { data: 'name', title: 'Financial Year' },
-              { data: 'received', title: 'Received', className: 'text-right', render: money },
-              { data: 'carryForwardIn', title: 'Carry Forward In', className: 'text-right', render: money },
-              { data: 'expenditure', title: 'Expenditure', className: 'text-right' },
-              { data: 'balance', title: 'Balance', className: 'text-right' },
-              { data: 'balance', title: 'Carry Forward Out', className: 'text-right', render: money },
-            ] as DTColumn[]}
-            slots={{
-              3: (_cell, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
-              4: (_cell, row) => (
-                <span className="font-semibold text-success">{formatINR(row.balance)}</span>
-              ),
-            }}
-            options={{ searching: false, order: [] }}
-          />
-        )}
-      </Card>
+        {/* Year-wise fund summary */}
+        <div className="p-6">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Year-wise Fund Summary</h2>
+          {yearRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No fund activity recorded yet.</p>
+          ) : (
+            <DataTable
+              className="display nowrap csr-dt-grid"
+              data={yearRows}
+              columns={[
+                { data: 'name', title: 'Financial Year' },
+                { data: 'received', title: 'Received', className: 'text-right', render: money },
+                { data: 'carryForwardIn', title: 'Carry Forward In', className: 'text-right', render: money },
+                { data: 'expenditure', title: 'Expenditure', className: 'text-right' },
+                { data: 'balance', title: 'Balance', className: 'text-right' },
+                { data: 'balance', title: 'Carry Forward Out', className: 'text-right', render: money },
+              ] as DTColumn[]}
+              slots={{
+                3: (_cell, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
+                4: (_cell, row) => (
+                  <span className="font-semibold text-success">{formatINR(row.balance)}</span>
+                ),
+              }}
+              options={{ searching: false, order: [] }}
+            />
+          )}
+        </div>
 
-      {/* Projects */}
-      <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-ink">Projects</h2>
-        {myProjects.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">No projects yet.</p>
-        ) : (
-          <div className="divide-y divide-line/60">
-            {myProjects.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="font-medium text-ink">{p.name}</p>
-                  <p className="text-xs text-muted">
-                    {yearName(p.financialYearId)} · {p.category} · {p.location}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className="font-semibold text-ink">{formatINR(p.budget)}</span>
-                  <StatusBadge status={p.status} />
+        {/* Projects */}
+        <div className="p-6">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Projects</h2>
+          {projectRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No projects yet.</p>
+          ) : (
+            <DataTable
+              className="display nowrap csr-dt-grid"
+              data={projectRows}
+              columns={[
+                { data: 'name', title: 'Project' },
+                { data: 'companyNames', title: 'Companies' },
+                { data: 'category', title: 'Category' },
+                { data: 'budget', title: 'Budget', className: 'text-right', render: money },
+                { data: 'status', title: 'Status' },
+                { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
+              ] as DTColumn[]}
+              slots={{
+                4: (_cell, row) => <StatusBadge status={row.status} />,
+                5: (_cell, row) => (
                   <button
-                    onClick={() => setViewProject(p)}
+                    onClick={() => setViewProject(row as Project)}
                     className="text-muted hover:text-primary"
                     title="View details, description & notes"
                   >
                     <Eye size={16} />
                   </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
+                ),
+              }}
+              options={{ searching: false, order: [] }}
+            />
+          )}
+        </div>
 
-      {/* Fund receipts */}
-      <Card className="mt-6 p-6">
-        <h2 className="mb-4 text-lg font-semibold text-ink">Fund Receipts</h2>
-        {myReceipts.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">No fund receipts yet.</p>
-        ) : (
-          <DataTable
-            data={receiptRows}
-            columns={[
-              { data: 'date', title: 'Date', render: dateCell },
-              { data: 'yearLabel', title: 'Year' },
-              { data: 'reference', title: 'Reference' },
-              { data: 'mode', title: 'Mode' },
-              { data: 'carryForward', title: 'Carry Forward', className: 'text-right', render: money },
-              { data: 'amount', title: 'Amount', className: 'text-right' },
-            ] as DTColumn[]}
-            slots={{
-              5: (_cell, row) => (
-                <span className="font-semibold text-success">{formatINR(row.amount)}</span>
-              ),
-            }}
-            options={{ searching: false, order: [] }}
-          />
-        )}
-      </Card>
+        {/* Fund receipts */}
+        <div className="p-6">
+          <h2 className="mb-4 text-lg font-semibold text-ink">Fund Receipts</h2>
+          {myReceipts.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">No fund receipts yet.</p>
+          ) : (
+            <DataTable
+              className="display nowrap csr-dt-grid"
+              data={receiptRows}
+              columns={[
+                { data: 'date', title: 'Date', render: dateCell },
+                { data: 'yearLabel', title: 'Year' },
+                { data: 'reference', title: 'Account Number' },
+                { data: 'amount', title: 'Amount', className: 'text-right' },
+              ] as DTColumn[]}
+              slots={{
+                3: (_cell, row) => (
+                  <span className="font-semibold text-success">{formatINR(row.amount)}</span>
+                ),
+              }}
+              options={{ searching: false, order: [] }}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Project detail view */}
       <DetailModal
@@ -297,8 +340,9 @@ export default function CompanyDetail() {
         rows={
           viewProject
             ? [
-                { label: 'Financial Year', value: yearName(viewProject.financialYearId) },
+                { label: 'Companies', value: companyNames(viewProject.companyIds ?? []) },
                 { label: 'Status', value: <StatusBadge status={viewProject.status} /> },
+                { label: 'Derived Status', value: viewProject.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
                 { label: 'Budget', value: formatINR(viewProject.budget) },
                 { label: 'Category', value: viewProject.category },
                 { label: 'Location', value: viewProject.location },
@@ -354,14 +398,5 @@ export default function CompanyDetail() {
         </form>
       </Modal>
     </>
-  )
-}
-
-function OverviewStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-ink/[0.03] px-4 py-3">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-lg font-bold text-ink">{value}</p>
-    </div>
   )
 }

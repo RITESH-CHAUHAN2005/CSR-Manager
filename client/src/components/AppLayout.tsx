@@ -3,22 +3,10 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import { Menu, Moon, Sun } from './icons'
 import { useTheme } from '../context/ThemeContext'
-import { useAuth } from '../context/AuthContext'
-
-function initials(name?: string) {
-  if (!name) return 'U'
-  return name
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
 
 export default function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, toggle } = useTheme()
-  const { user } = useAuth()
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -36,9 +24,7 @@ export default function AppLayout() {
               <Menu size={22} />
             </button>
             <div className="flex items-center gap-2 lg:hidden">
-              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-line">
-                <img src="/logo.png" alt="CSR Fund Manager" className="h-full w-full object-contain" />
-              </div>
+              <img src="/logo.png" alt="CSR Fund Manager" className="h-8 w-8 object-contain" />
               <span className="text-sm font-semibold text-ink">CSR Fund Manager</span>
             </div>
           </div>
@@ -65,13 +51,6 @@ export default function AppLayout() {
                 />
               </span>
             </button>
-
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-light text-xs font-semibold text-white shadow-sm ring-1 ring-line"
-              title={user?.name}
-            >
-              {initials(user?.name)}
-            </div>
           </div>
         </header>
 

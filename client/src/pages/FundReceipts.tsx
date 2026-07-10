@@ -6,8 +6,10 @@ import {
   companyService,
   financialYearService,
   fundReceiptService,
+  masterDataService,
+  projectService,
 } from '../services/dataService'
-import type { FundReceipt, PaymentMode } from '../types'
+import type { FundReceipt, FundReceiptType } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
@@ -27,14 +29,14 @@ import {
   TextInput,
 } from '../components/ui'
 
-const MODES: PaymentMode[] = ['NEFT', 'RTGS', 'Cheque']
 const emptyForm = {
   date: '',
+  receiptType: 'company' as FundReceiptType,
   companyId: '',
+  source: '',
   financialYearId: '',
+  projectId: '',
   amount: 0,
-  carryForward: 0,
-  mode: 'NEFT' as PaymentMode,
   reference: '',
   notes: '',
 }
@@ -45,6 +47,9 @@ export default function FundReceipts() {
   const { data: receipts = [] } = useQuery({ queryKey: ['fund-receipts'], queryFn: fundReceiptService.list })
   const { data: companies = [] } = useQuery({ queryKey: ['companies'], queryFn: companyService.list })
   const { data: years = [] } = useQuery({ queryKey: ['financial-years'], queryFn: financialYearService.list })
+  const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: projectService.list })
+  const { data: masterData = [] } = useQuery({ queryKey: ['master-data'], queryFn: masterDataService.list })
+  const sourceOptions = useMemo(() => masterData.filter((m) => m.type === 'source'), [masterData])
 
   const [companyFilter, setCompanyFilter] = useState('')
   const [yearFilter, setYearFilter] = useState('')
@@ -56,8 +61,18 @@ export default function FundReceipts() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
 
-  const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? '—'
+  const companyName = (id?: string) => (id ? companies.find((c) => c.id === id)?.name ?? '—' : '—')
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
+  const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? '—' : '—')
+  // What shows in the "Donor Company / Source" column — depends on how the receipt was recorded.
+  const partyLabel = (r: FundReceipt) => (r.receiptType === 'other_source' ? r.source || '—' : companyName(r.companyId))
+
+  // When the chosen project is linked to more than one company, a "which company"
+  // helper appears below the Project field so the right Donor Company can be picked.
+  const selectedProjectCompanies = useMemo(() => {
+    const proj = projects.find((p) => p.id === form.projectId)
+    return proj?.companyIds ?? []
+  }, [projects, form.projectId])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -66,18 +81,20 @@ export default function FundReceipts() {
         (!companyFilter || r.companyId === companyFilter) &&
         (!yearFilter || r.financialYearId === yearFilter) &&
         (!q ||
-          [r.reference, r.mode, companyName(r.companyId)].some((f) => (f ?? '').toLowerCase().includes(q))),
+          [r.reference, partyLabel(r), projectName(r.projectId)].some((f) =>
+            (f ?? '').toLowerCase().includes(q),
+          )),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receipts, companyFilter, yearFilter, search, companies])
+  }, [receipts, companyFilter, yearFilter, search, companies, projects])
   const total = filtered.reduce((s, r) => s + r.amount, 0)
 
-  const money = (d: unknown, type: string) => (type === 'display' ? formatINR(Number(d)) : Number(d))
   const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
   const rows = filtered.map((r) => ({
     ...r,
-    companyName: companyName(r.companyId),
+    partyLabel: partyLabel(r),
     yearName: yearName(r.financialYearId),
+    projectName: projectName(r.projectId),
   }))
 
   const invalidate = () => {
@@ -103,9 +120,15 @@ export default function FundReceipts() {
     return activeYears
   }, [activeYears, years, form.financialYearId])
 
-  function openAdd() {
+  function openAdd(receiptType: FundReceiptType) {
     setEditing(null)
-    setForm({ ...emptyForm, companyId: companies[0]?.id ?? '', financialYearId: activeYears[0]?.id ?? '' })
+    setForm({
+      ...emptyForm,
+      receiptType,
+      companyId: receiptType === 'company' ? companies[0]?.id ?? '' : '',
+      source: receiptType === 'other_source' ? sourceOptions[0]?.value ?? '' : '',
+      financialYearId: activeYears[0]?.id ?? '',
+    })
     setFormError('')
     setOpen(true)
   }
@@ -118,7 +141,12 @@ export default function FundReceipts() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
-    const payload = { ...form, amount: Number(form.amount), carryForward: Number(form.carryForward) }
+    const payload = {
+      ...form,
+      amount: Number(form.amount),
+      companyId: form.receiptType === 'company' ? form.companyId : '',
+      source: form.receiptType === 'other_source' ? form.source : '',
+    }
     try {
       if (editing) await updateM.mutateAsync({ id: editing.id, data: payload })
       else await createM.mutateAsync(payload)
@@ -133,7 +161,19 @@ export default function FundReceipts() {
       <PageHeader
         title="Fund Receipts"
         subtitle={`${filtered.length} records — Total: ${formatINR(total)}`}
-        action={canCreate && <PrimaryButton onClick={openAdd}>Record Receipt</PrimaryButton>}
+        action={
+          canCreate && (
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => openAdd('other_source')}
+                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-ink/5"
+              >
+                Receipt From Other Source
+              </button>
+              <PrimaryButton onClick={() => openAdd('company')}>Record Receipt</PrimaryButton>
+            </div>
+          )
+        }
       />
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -153,17 +193,16 @@ export default function FundReceipts() {
           data={rows}
           columns={[
             { data: 'date', title: 'Date', render: dateCell },
-            { data: 'companyName', title: 'Company' },
+            { data: 'partyLabel', title: 'Donor Company / Source' },
             { data: 'yearName', title: 'Year' },
-            { data: 'reference', title: 'Reference' },
-            { data: 'mode', title: 'Mode' },
-            { data: 'carryForward', title: 'Carry Forward', className: 'text-right', render: money },
+            { data: 'projectName', title: 'Project' },
+            { data: 'reference', title: 'Account Number' },
             { data: 'amount', title: 'Amount', className: 'text-right' },
             { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
           ]}
           slots={{
-            6: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
-            7: (_v, row) => (
+            5: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
+            6: (_v, row) => (
               <div className="flex justify-end gap-3">
                 <button onClick={() => setViewing(row as FundReceipt)} className="text-muted hover:text-primary" title="View details & notes"><Eye size={16} /></button>
                 {canWrite && (
@@ -179,36 +218,63 @@ export default function FundReceipts() {
         />
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Receipt' : 'Record Fund Receipt'}>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={
+          editing
+            ? 'Edit Receipt'
+            : form.receiptType === 'other_source'
+              ? 'Receipt From Other Source'
+              : 'Record Fund Receipt'
+        }
+      >
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Company">
-              <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
-                {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </FormSelect>
-            </Field>
+            {form.receiptType === 'other_source' ? (
+              <Field label="Source">
+                <FormSelect required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                  <option value="">Select source</option>
+                  {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
+                </FormSelect>
+              </Field>
+            ) : (
+              <Field label="Donor Company">
+                <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
+                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </FormSelect>
+              </Field>
+            )}
             <Field label="Financial Year">
               <FormSelect required value={form.financialYearId} onChange={(e) => setForm({ ...form, financialYearId: e.target.value })}>
                 {yearOptions.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
               </FormSelect>
             </Field>
+            <Field label="Project">
+              <FormSelect value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
+                <option value="">No project</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </FormSelect>
+            </Field>
+            {form.receiptType === 'company' && form.projectId && selectedProjectCompanies.length > 1 && (
+              <Field label="Project's Contributing Company">
+                <FormSelect value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
+                  <option value="">Select company</option>
+                  {selectedProjectCompanies.map((cid) => (
+                    <option key={cid} value={cid}>{companyName(cid)}</option>
+                  ))}
+                </FormSelect>
+              </Field>
+            )}
             <Field label="Amount (₹)">
               <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
             </Field>
-            <Field label="Carry Forward Amount (₹)">
-              <TextInput type="number" min={0} value={form.carryForward} onChange={(e) => setForm({ ...form, carryForward: Number(e.target.value) })} />
-            </Field>
             <Field label="Receipt Date">
-              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
-            </Field>
-            <Field label="Payment Mode">
-              <FormSelect value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as PaymentMode })}>
-                {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </FormSelect>
+              <DatePicker required maxDate="today" value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
             </Field>
           </div>
-          <Field label="Reference Number">
-            <TextInput placeholder="Transaction / cheque reference" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+          <Field label="Account Number">
+            <TextInput placeholder="Bank account number" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
           </Field>
           <Field label="Notes">
             <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -224,16 +290,17 @@ export default function FundReceipts() {
       <DetailModal
         open={!!viewing}
         onClose={() => setViewing(null)}
-        title={viewing ? `Receipt — ${companyName(viewing.companyId)}` : 'Fund Receipt'}
+        title={viewing ? `Receipt — ${partyLabel(viewing)}` : 'Fund Receipt'}
         rows={
           viewing
             ? [
                 { label: 'Date', value: viewing.date ? formatDate(viewing.date) : '' },
                 { label: 'Financial Year', value: yearName(viewing.financialYearId) },
-                { label: 'Company', value: companyName(viewing.companyId) },
-                { label: 'Reference', value: viewing.reference },
-                { label: 'Payment Mode', value: viewing.mode },
-                { label: 'Carry Forward', value: formatINR(viewing.carryForward) },
+                viewing.receiptType === 'other_source'
+                  ? { label: 'Source', value: viewing.source }
+                  : { label: 'Donor Company', value: companyName(viewing.companyId) },
+                { label: 'Project', value: projectName(viewing.projectId) },
+                { label: 'Account Number', value: viewing.reference },
                 { label: 'Amount', value: <span className="font-semibold text-success">{formatINR(viewing.amount)}</span> },
                 { label: 'Recorded By', value: viewing.createdByName || viewing.createdByEmail },
               ]

@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Mail, Pencil, Phone, Trash2, User } from '../components/icons'
-import { companyService, analyticsService } from '../services/dataService'
+import { ChevronRight, Pencil, Trash2 } from '../components/icons'
+import { companyService } from '../services/dataService'
 import type { Company } from '../types'
-import { formatINR } from '../lib/currency'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
-  Card,
   ConfirmDialog,
   Field,
   Modal,
@@ -34,10 +32,6 @@ export default function Companies() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { data: companies = [] } = useQuery({ queryKey: ['companies'], queryFn: companyService.list })
-  const { data: positions = [] } = useQuery({
-    queryKey: ['company-positions'],
-    queryFn: analyticsService.companyPositions,
-  })
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Company | null>(null)
@@ -53,11 +47,6 @@ export default function Companies() {
       [c.name, c.cin, c.contactPerson, c.email].some((f) => (f ?? '').toLowerCase().includes(q)),
     )
   }, [companies, search])
-
-  const posById = useMemo(
-    () => Object.fromEntries(positions.map((p) => [p.companyId, p])),
-    [positions],
-  )
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['companies'] })
@@ -114,70 +103,60 @@ export default function Companies() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((c) => {
-          const p = posById[c.id]
-          return (
-            <Card key={c.id} className="lift flex flex-col p-5">
-              <div className="mb-3">
-                <h3 className="text-lg font-semibold text-ink">{c.name}</h3>
-                {c.cin && <p className="text-xs uppercase tracking-wide text-muted">{c.cin}</p>}
+        {filtered.map((c) => (
+          <div key={c.id} className="flex flex-col rounded-xl border border-line/70 p-5 transition-colors hover:border-primary/40">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold text-ink">{c.name}</h3>
+            </div>
+
+            <div className="mb-4 overflow-x-auto rounded-xl border border-line/60">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-line/60">
+                    <th className="w-1/3 border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">CIN</th>
+                    <td className="px-3 py-2 text-ink/80">{c.cin || '—'}</td>
+                  </tr>
+                  <tr className="border-b border-line/60">
+                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Contact</th>
+                    <td className="px-3 py-2 text-ink/80">{c.contactPerson || '—'}</td>
+                  </tr>
+                  <tr className="border-b border-line/60">
+                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Email</th>
+                    <td className="px-3 py-2 text-ink/80">{c.email || '—'}</td>
+                  </tr>
+                  <tr>
+                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Phone</th>
+                    <td className="px-3 py-2 text-ink/80">{c.phone || '—'}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <button
+              onClick={() => navigate(`/companies/${c.id}`)}
+              className="mt-auto flex items-center justify-between rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            >
+              View Details <ChevronRight size={16} />
+            </button>
+
+            {canWrite && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => openEdit(c)}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5"
+                >
+                  <Pencil size={15} /> Edit
+                </button>
+                <button
+                  onClick={() => setDeleteId(c.id)}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-danger/30 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
+                >
+                  <Trash2 size={15} /> Delete
+                </button>
               </div>
-
-              <div className="space-y-1.5 text-sm text-ink/80">
-                {c.contactPerson && (
-                  <p className="flex items-center gap-2">
-                    <User size={14} className="text-muted" /> {c.contactPerson}
-                  </p>
-                )}
-                {c.email && (
-                  <p className="flex items-center gap-2">
-                    <Mail size={14} className="text-muted" /> {c.email}
-                  </p>
-                )}
-                {c.phone && (
-                  <p className="flex items-center gap-2">
-                    <Phone size={14} className="text-muted" /> {c.phone}
-                  </p>
-                )}
-              </div>
-
-              <div className="my-4 grid grid-cols-2 gap-y-3 border-t border-line/60 pt-4 text-sm">
-                <Stat label="Received" value={formatINR(p?.totalReceived ?? 0)} />
-                <Stat label="Balance" value={formatINR(p?.balance ?? 0)} valueClass="text-success" />
-                <Stat label="Projects" value={String(p?.projects ?? 0)} />
-                <Stat
-                  label="Expenditure"
-                  value={formatINR(p?.expenditure ?? 0)}
-                  valueClass="text-danger"
-                />
-              </div>
-
-              <button
-                onClick={() => navigate(`/companies/${c.id}`)}
-                className="mt-auto flex items-center justify-between rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
-              >
-                View Details <ChevronRight size={16} />
-              </button>
-
-              {canWrite && (
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => openEdit(c)}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5"
-                  >
-                    <Pencil size={15} /> Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteId(c.id)}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-danger/30 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
-                  >
-                    <Trash2 size={15} /> Delete
-                  </button>
-                </div>
-              )}
-            </Card>
-          )
-        })}
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Add / Edit form */}
@@ -268,11 +247,3 @@ export default function Companies() {
   )
 }
 
-function Stat({ label, value, valueClass = 'text-ink' }: { label: string; value: string; valueClass?: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted">{label}</p>
-      <p className={`font-semibold ${valueClass}`}>{value}</p>
-    </div>
-  )
-}

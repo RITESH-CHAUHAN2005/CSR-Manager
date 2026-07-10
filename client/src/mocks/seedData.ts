@@ -46,17 +46,23 @@ export const companies: Company[] = [
 ]
 
 export const financialYears: FinancialYear[] = [
+  { id: 'fy_2020', name: 'FY 2020-21', startDate: '2020-04-01', endDate: '2021-03-31', isActive: false },
+  { id: 'fy_2021', name: 'FY 2021-22', startDate: '2021-04-01', endDate: '2022-03-31', isActive: false },
   { id: 'fy1', name: 'FY 2022-23', startDate: '2022-04-01', endDate: '2023-03-31', isActive: false },
   { id: 'fy2', name: 'FY 2023-24', startDate: '2023-04-01', endDate: '2024-03-31', isActive: false },
-  { id: 'fy3', name: 'FY 2024-25', startDate: '2024-04-01', endDate: '2025-03-31', isActive: true },
+  { id: 'fy3', name: 'FY 2024-25', startDate: '2024-04-01', endDate: '2025-03-31', isActive: false },
+  { id: 'fy_2025', name: 'FY 2025-26', startDate: '2025-04-01', endDate: '2026-03-31', isActive: false },
+  { id: 'fy_2026', name: 'FY 2026-27', startDate: '2026-04-01', endDate: '2027-03-31', isActive: true },
 ]
 
 export const projects: Project[] = [
   {
     id: 'p1',
     name: 'Digital Literacy Program',
-    companyId: 'c3',
-    financialYearId: 'fy1',
+    companyIds: ['c3'],
+    derivedStatus: 'other',
+    startDate: '2022-04-15',
+    endDate: '2023-03-31',
     category: 'Education',
     location: 'Pune, Maharashtra',
     budget: 2500000,
@@ -66,8 +72,10 @@ export const projects: Project[] = [
   {
     id: 'p2',
     name: 'Clean Water Initiative',
-    companyId: 'c3',
-    financialYearId: 'fy2',
+    companyIds: ['c3'],
+    derivedStatus: 'other',
+    startDate: '2023-05-10',
+    endDate: '2024-03-31',
     category: 'Environment',
     location: 'Nagpur District',
     budget: 3500000,
@@ -77,8 +85,10 @@ export const projects: Project[] = [
   {
     id: 'p3',
     name: 'Women Empowerment Program',
-    companyId: 'c3',
-    financialYearId: 'fy3',
+    companyIds: ['c3'],
+    derivedStatus: 'ongoing',
+    startDate: '2024-04-20',
+    endDate: '2029-03-31',
     category: 'Skill Development',
     location: 'Nashik, Maharashtra',
     budget: 4000000,
@@ -88,8 +98,10 @@ export const projects: Project[] = [
   {
     id: 'p4',
     name: 'BridgeIT Scholarship',
-    companyId: 'c2',
-    financialYearId: 'fy2',
+    companyIds: ['c2'],
+    derivedStatus: 'other',
+    startDate: '2023-07-01',
+    endDate: '2024-03-31',
     category: 'Education',
     location: 'Bengaluru, Karnataka',
     budget: 1800000,
@@ -99,8 +111,10 @@ export const projects: Project[] = [
   {
     id: 'p5',
     name: 'Rural Healthcare Camp',
-    companyId: 'c2',
-    financialYearId: 'fy3',
+    companyIds: ['c2'],
+    derivedStatus: 'ongoing',
+    startDate: '2024-06-10',
+    endDate: '2029-03-31',
     category: 'Healthcare',
     location: 'Mysuru District, Karnataka',
     budget: 2200000,
@@ -110,8 +124,10 @@ export const projects: Project[] = [
   {
     id: 'p6',
     name: 'Tree Plantation Drive',
-    companyId: 'c1',
-    financialYearId: 'fy2',
+    companyIds: ['c1'],
+    derivedStatus: 'other',
+    startDate: '2023-08-05',
+    endDate: '2024-03-31',
     category: 'Environment',
     location: 'Thane, Maharashtra',
     budget: 1000000,
@@ -121,8 +137,10 @@ export const projects: Project[] = [
   {
     id: 'p7',
     name: 'Old Age Care Center',
-    companyId: 'c1',
-    financialYearId: 'fy3',
+    companyIds: ['c1'],
+    derivedStatus: 'ongoing',
+    startDate: '2024-07-15',
+    endDate: '2029-03-31',
     category: 'Healthcare',
     location: 'Mumbai, Maharashtra',
     budget: 2000000,
@@ -132,13 +150,13 @@ export const projects: Project[] = [
 ]
 
 export const fundReceipts: FundReceipt[] = [
-  { id: 'r1', date: '2022-04-15', companyId: 'c3', financialYearId: 'fy1', reference: 'TCS/CSR/2022-23/001', mode: 'NEFT', carryForward: 0, amount: 2500000 },
-  { id: 'r2', date: '2023-05-10', companyId: 'c3', financialYearId: 'fy2', reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 250000, amount: 3500000 },
-  { id: 'r3', date: '2023-07-01', companyId: 'c2', financialYearId: 'fy2', reference: 'INF/2023-24/SCH/001', mode: 'NEFT', carryForward: 0, amount: 1800000 },
-  { id: 'r4', date: '2023-08-05', companyId: 'c1', financialYearId: 'fy2', reference: 'HDFC/CSR/2023-24/TP', mode: 'Cheque', carryForward: 0, amount: 800000 },
-  { id: 'r5', date: '2024-04-20', companyId: 'c3', financialYearId: 'fy3', reference: 'TCS/CSR/2024-25/001', mode: 'RTGS', carryForward: 0, amount: 4000000 },
-  { id: 'r6', date: '2024-06-10', companyId: 'c2', financialYearId: 'fy3', reference: 'INF/2024-25/HC/001', mode: 'NEFT', carryForward: 0, amount: 2200000 },
-  { id: 'r7', date: '2024-07-15', companyId: 'c1', financialYearId: 'fy3', reference: 'HDFC/CSR/2024-25/OAC', mode: 'RTGS', carryForward: 0, amount: 3000000 },
+  { id: 'r1', date: '2022-04-15', receiptType: 'company', companyId: 'c3', financialYearId: 'fy1', reference: 'TCS/CSR/2022-23/001', mode: 'NEFT', carryForward: 0, amount: 2500000 },
+  { id: 'r2', date: '2023-05-10', receiptType: 'company', companyId: 'c3', financialYearId: 'fy2', reference: 'TCS/CSR/2023-24/001', mode: 'RTGS', carryForward: 250000, amount: 3500000 },
+  { id: 'r3', date: '2023-07-01', receiptType: 'company', companyId: 'c2', financialYearId: 'fy2', reference: 'INF/2023-24/SCH/001', mode: 'NEFT', carryForward: 0, amount: 1800000 },
+  { id: 'r4', date: '2023-08-05', receiptType: 'company', companyId: 'c1', financialYearId: 'fy2', reference: 'HDFC/CSR/2023-24/TP', mode: 'Cheque', carryForward: 0, amount: 800000 },
+  { id: 'r5', date: '2024-04-20', receiptType: 'company', companyId: 'c3', financialYearId: 'fy3', reference: 'TCS/CSR/2024-25/001', mode: 'RTGS', carryForward: 0, amount: 4000000 },
+  { id: 'r6', date: '2024-06-10', receiptType: 'company', companyId: 'c2', financialYearId: 'fy3', reference: 'INF/2024-25/HC/001', mode: 'NEFT', carryForward: 0, amount: 2200000 },
+  { id: 'r7', date: '2024-07-15', receiptType: 'company', companyId: 'c1', financialYearId: 'fy3', reference: 'HDFC/CSR/2024-25/OAC', mode: 'RTGS', carryForward: 0, amount: 3000000 },
 ]
 
 export const expenditures: Expenditure[] = [

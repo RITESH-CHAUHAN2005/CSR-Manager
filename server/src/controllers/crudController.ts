@@ -11,10 +11,12 @@ function labelOf(doc: Record<string, unknown>): string {
 
 // Factory producing standard REST handlers for a Mongoose model.
 // Writes are gated at the route level (requireAdmin or allowUserCreate); these stay generic.
-export function crudController<T>(model: Model<T>) {
+// `listSort` overrides the default creation-order sort — e.g. Financial Years
+// list chronologically by startDate, not by when each record was added.
+export function crudController<T>(model: Model<T>, listSort: Record<string, 1 | -1> = { createdAt: 1 }) {
   return {
     list: asyncHandler(async (_req: Request, res: Response) => {
-      const docs = await model.find().sort({ createdAt: 1 })
+      const docs = await model.find().sort(listSort)
       res.json(docs)
     }),
 
