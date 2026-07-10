@@ -110,7 +110,7 @@ export interface FundReceipt extends CreatedBy {
   id: string
   date: string // ISO yyyy-mm-dd
   receiptType: FundReceiptType
-  companyId?: string // labeled "Donor Company" in the UI — set when receiptType is 'company'
+  companyId?: string // required (Donor Company) when receiptType is 'company'; optional tag when 'other_source'
   source?: string // Master Data "source" value — set when receiptType is 'other_source'
   financialYearId: string
   projectId?: string // optional link to the project this receipt funds

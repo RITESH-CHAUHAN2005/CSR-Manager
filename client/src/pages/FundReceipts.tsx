@@ -36,7 +36,7 @@ const emptyForm = {
   source: '',
   financialYearId: '',
   projectId: '',
-  amount: 0,
+  amount: '' as number | string,
   reference: '',
   notes: '',
 }
@@ -65,7 +65,13 @@ export default function FundReceipts() {
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
   const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? '—' : '—')
   // What shows in the "Donor Company / Source" column — depends on how the receipt was recorded.
-  const partyLabel = (r: FundReceipt) => (r.receiptType === 'other_source' ? r.source || '—' : companyName(r.companyId))
+  // An 'other_source' receipt can now optionally also be tagged to a company (e.g.
+  // money received from a company before its project has started), so show both.
+  const partyLabel = (r: FundReceipt) => {
+    if (r.receiptType !== 'other_source') return companyName(r.companyId)
+    const src = r.source || '—'
+    return r.companyId ? `${src} — ${companyName(r.companyId)}` : src
+  }
 
   // When the chosen project is linked to more than one company, a "which company"
   // helper appears below the Project field so the right Donor Company can be picked.
@@ -144,7 +150,8 @@ export default function FundReceipts() {
     const payload = {
       ...form,
       amount: Number(form.amount),
-      companyId: form.receiptType === 'company' ? form.companyId : '',
+      // companyId is kept for BOTH types now — an 'other_source' receipt can
+      // optionally tag which company it came from (e.g. before a project starts).
       source: form.receiptType === 'other_source' ? form.source : '',
     }
     try {
@@ -232,12 +239,23 @@ export default function FundReceipts() {
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {form.receiptType === 'other_source' ? (
-              <Field label="Source">
-                <FormSelect required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-                  <option value="">Select source</option>
-                  {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
-                </FormSelect>
-              </Field>
+              <>
+                <Field label="Source">
+                  <FormSelect required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                    <option value="">Select source</option>
+                    {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
+                  </FormSelect>
+                </Field>
+                <Field label="Company (optional)">
+                  <FormSelect value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
+                    <option value="">No company</option>
+                    {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </FormSelect>
+                  <p className="mt-1 text-xs text-muted">
+                    Tag a company if this money is from them (e.g. received before their project has started).
+                  </p>
+                </Field>
+              </>
             ) : (
               <Field label="Donor Company">
                 <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
@@ -267,7 +285,7 @@ export default function FundReceipts() {
               </Field>
             )}
             <Field label="Amount (₹)">
-              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             </Field>
             <Field label="Receipt Date">
               <DatePicker required maxDate="today" value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
@@ -296,9 +314,12 @@ export default function FundReceipts() {
             ? [
                 { label: 'Date', value: viewing.date ? formatDate(viewing.date) : '' },
                 { label: 'Financial Year', value: yearName(viewing.financialYearId) },
-                viewing.receiptType === 'other_source'
-                  ? { label: 'Source', value: viewing.source }
-                  : { label: 'Donor Company', value: companyName(viewing.companyId) },
+                ...(viewing.receiptType === 'other_source'
+                  ? [
+                      { label: 'Source', value: viewing.source },
+                      ...(viewing.companyId ? [{ label: 'Company', value: companyName(viewing.companyId) }] : []),
+                    ]
+                  : [{ label: 'Donor Company', value: companyName(viewing.companyId) }]),
                 { label: 'Project', value: projectName(viewing.projectId) },
                 { label: 'Account Number', value: viewing.reference },
                 { label: 'Amount', value: <span className="font-semibold text-success">{formatINR(viewing.amount)}</span> },

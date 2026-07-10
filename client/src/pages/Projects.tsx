@@ -47,7 +47,7 @@ const emptyForm = {
   companyIds: [] as string[],
   status: 'active' as ProjectStatus,
   derivedStatus: 'other' as DerivedStatus,
-  budget: 0,
+  budget: '' as number | string,
   category: '',
   location: '',
   startDate: '',
@@ -334,7 +334,7 @@ export default function Projects() {
               </FormSelect>
             </Field>
             <Field label="Approved Budget (₹)">
-              <TextInput type="number" min={0} value={form.budget} onChange={(e) => setForm({ ...form, budget: Number(e.target.value) })} />
+              <TextInput type="number" min={0} value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
             </Field>
             <Field label="Category">
               <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>

@@ -317,7 +317,9 @@ export default function Reports() {
       date: r.date,
       company:
         r.receiptType === "other_source"
-          ? r.source || "Other Source"
+          ? r.companyId
+            ? `${r.source || "Other Source"} — ${companies.find((c) => c.id === r.companyId)?.name ?? "—"}`
+            : r.source || "Other Source"
           : companies.find((c) => c.id === r.companyId)?.name ?? "—",
       project: r.projectId ? projects.find((p) => p.id === r.projectId)?.name ?? "—" : "—",
       fy: years.find((y) => y.id === r.financialYearId)?.name ?? "—",

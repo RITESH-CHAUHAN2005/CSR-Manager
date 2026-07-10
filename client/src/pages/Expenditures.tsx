@@ -38,9 +38,9 @@ const emptyForm = {
   projectId: '',
   companyId: '',
   financialYearId: '',
-  amount: 0,
+  amount: '' as number | string,
   // Only meaningful when the selected project is Ongoing.
-  carryForwardAmount: 0,
+  carryForwardAmount: '' as number | string,
   category: '',
   approvedBy: '',
   description: '',
@@ -152,7 +152,7 @@ export default function Expenditures() {
       projectId,
       companyId: ids.length === 1 ? ids[0] : ids.includes(f.companyId) ? f.companyId : '',
       // Carry forward only ever applies to an Ongoing project.
-      carryForwardAmount: proj?.derivedStatus === 'ongoing' ? f.carryForwardAmount : 0,
+      carryForwardAmount: proj?.derivedStatus === 'ongoing' ? f.carryForwardAmount : '',
     }))
   }
 
@@ -294,7 +294,7 @@ export default function Expenditures() {
               </FormSelect>
             </Field>
             <Field label="Amount (₹)">
-              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
+              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             </Field>
             <Field label="Date">
               <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
@@ -317,7 +317,7 @@ export default function Expenditures() {
                   type="number"
                   min={0}
                   value={form.carryForwardAmount}
-                  onChange={(e) => setForm({ ...form, carryForwardAmount: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, carryForwardAmount: e.target.value })}
                 />
               </Field>
             )}
