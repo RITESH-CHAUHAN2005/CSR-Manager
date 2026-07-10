@@ -15,6 +15,7 @@ export const expenditureService = impl.expenditureService
 export const masterDataService = impl.masterDataService
 export const projectDocumentService = impl.projectDocumentService
 export const expenditureDocumentService = impl.expenditureDocumentService
+export const fundReceiptDocumentService = impl.fundReceiptDocumentService
 export const analyticsService = impl.analyticsService
 export const userAdminService = impl.userAdminService
 export const logService = impl.logService

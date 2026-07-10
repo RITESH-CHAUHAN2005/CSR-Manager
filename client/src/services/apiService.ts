@@ -10,6 +10,7 @@ import type {
   ExpenditureDocumentMeta,
   FinancialYear,
   FundReceipt,
+  FundReceiptDocumentMeta,
   ManagedUser,
   MasterDataItem,
   NewUserInput,
@@ -82,6 +83,27 @@ export const expenditureDocumentService = {
   downloadUrl: (expenditureId: string, docId: string) => {
     const base = api.defaults.baseURL ?? '/api'
     return `${base}/expenditures/${expenditureId}/documents/${docId}/download`
+  },
+}
+
+// Fund receipt proof-of-payment attachments — mirrors projectDocumentService.
+export const fundReceiptDocumentService = {
+  list: (fundReceiptId: string) =>
+    api.get<FundReceiptDocumentMeta[]>(`/fund-receipts/${fundReceiptId}/documents`).then((r) => r.data),
+  upload: (fundReceiptId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return api
+      .post<FundReceiptDocumentMeta>(`/fund-receipts/${fundReceiptId}/documents`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data)
+  },
+  remove: (fundReceiptId: string, docId: string) =>
+    api.delete<{ id: string }>(`/fund-receipts/${fundReceiptId}/documents/${docId}`).then((r) => r.data),
+  downloadUrl: (fundReceiptId: string, docId: string) => {
+    const base = api.defaults.baseURL ?? '/api'
+    return `${base}/fund-receipts/${fundReceiptId}/documents/${docId}/download`
   },
 }
 

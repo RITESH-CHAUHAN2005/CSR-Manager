@@ -180,15 +180,25 @@ select:-webkit-autofill {
 .select2-container--default .select2-selection--single .select2-selection__placeholder {
   color: rgb(var(--color-muted));
 }
+/* Replace Select2's stacked CSS-triangle caret with the same thin chevron the rest
+   of the app uses, so a dropdown reads like every other field. */
 .select2-container--default .select2-selection--single .select2-selection__arrow {
   height: 40px;
-  right: 8px;
+  right: 12px;
+  width: 12px;
 }
 .select2-container--default .select2-selection--single .select2-selection__arrow b {
-  border-color: rgb(var(--color-muted)) transparent transparent transparent;
+  border: none;
+  margin: 0;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid rgb(var(--color-muted));
+  border-bottom: 1.5px solid rgb(var(--color-muted));
+  transform: translate(-50%, -70%) rotate(45deg);
+  transition: transform 0.15s ease;
 }
 .select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b {
-  border-color: transparent transparent rgb(var(--color-muted)) transparent;
+  transform: translate(-50%, -30%) rotate(225deg);
 }
 .select2-container--default.select2-container--focus .select2-selection--single,
 .select2-container--default.select2-container--open .select2-selection--single {

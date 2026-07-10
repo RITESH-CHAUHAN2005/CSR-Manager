@@ -13,7 +13,13 @@ function labelOf(doc: Record<string, unknown>): string {
 // Writes are gated at the route level (requireAdmin or allowUserCreate); these stay generic.
 // `listSort` overrides the default creation-order sort — e.g. Financial Years
 // list chronologically by startDate, not by when each record was added.
-export function crudController<T>(model: Model<T>, listSort: Record<string, 1 | -1> = { createdAt: 1 }) {
+// `onDeleted` cleans up records that belong to the deleted one (e.g. its uploaded
+// documents), so deleting a parent never orphans blobs in the database.
+export function crudController<T>(
+  model: Model<T>,
+  listSort: Record<string, 1 | -1> = { createdAt: 1 },
+  onDeleted?: (id: string) => Promise<unknown>,
+) {
   return {
     list: asyncHandler(async (_req: Request, res: Response) => {
       const docs = await model.find().sort(listSort)
@@ -65,6 +71,7 @@ export function crudController<T>(model: Model<T>, listSort: Record<string, 1 | 
     remove: asyncHandler(async (req: Request, res: Response) => {
       const doc = await model.findByIdAndDelete(req.params.id)
       if (!doc) throw new ApiError(404, 'Not found')
+      await onDeleted?.(req.params.id)
       const json = doc.toJSON() as Record<string, unknown>
       res.locals.auditLabel = labelOf(json)
       res.locals.auditBefore = await snapshot(json) // what was removed

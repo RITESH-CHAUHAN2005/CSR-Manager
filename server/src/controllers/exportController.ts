@@ -107,9 +107,7 @@ async function projectReport(): Promise<ReportSpec> {
   const rows = projects.map((p) => {
     const id = String(p._id)
     const spent = sum(expenditures.filter((e) => String(e.projectId) === id).map((e) => e.amount))
-    // Pledged by the contributing companies vs what has actually landed against
-    // this project. Budget is the approved cost and is tracked separately.
-    const committed = sum((p.commitments ?? []).map((c) => c.committedAmount ?? 0))
+    // What has actually landed against this project. Budget is the approved cost.
     const received = sum(receipts.filter((r) => String(r.projectId) === id).map((r) => r.amount))
     const companyNames =
       companies
@@ -117,7 +115,7 @@ async function projectReport(): Promise<ReportSpec> {
         .map((c) => c.name)
         .join(', ') || '—'
     const utilization = p.budget ? Math.round((spent / p.budget) * 100) : 0
-    return [p.name, companyNames, p.budget, committed, received, spent, utilization, p.status]
+    return [p.name, companyNames, p.budget, received, spent, utilization, p.status]
   })
   return {
     title: 'Project-wise Financial Report',
@@ -126,7 +124,6 @@ async function projectReport(): Promise<ReportSpec> {
       { header: 'Project', width: 130, kind: 'text' },
       { header: 'Company', width: 130, kind: 'text' },
       { header: 'Budget', width: 100, kind: 'money' },
-      { header: 'Committed', width: 100, kind: 'money' },
       { header: 'Received', width: 100, kind: 'money' },
       { header: 'Spent', width: 100, kind: 'money' },
       { header: 'Utilization', width: 80, kind: 'percent' },

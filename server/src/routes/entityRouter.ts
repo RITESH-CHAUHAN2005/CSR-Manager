@@ -21,6 +21,9 @@ interface EntityRouterOptions {
   // Overrides the default "sort by creation order" for GET / — e.g. Financial
   // Years should list chronologically by startDate, not by insertion order.
   listSort?: Record<string, 1 | -1>
+  // Runs after a successful delete — removes dependent records (e.g. the deleted
+  // record's uploaded documents) so nothing is left orphaned.
+  onDeleted?: (id: string) => Promise<unknown>
 }
 
 // Standard secured REST resource:
@@ -33,7 +36,7 @@ export function entityRouter<T>(
   entity: string,
   opts: EntityRouterOptions = {},
 ) {
-  const c = crudController(model, opts.listSort)
+  const c = crudController(model, opts.listSort, opts.onDeleted)
   const router = Router()
 
   router.use(authenticate)

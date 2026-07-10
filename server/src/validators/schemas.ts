@@ -53,22 +53,13 @@ export const financialYearSchema = z.object({
   isActive: z.boolean().optional().default(false),
 })
 
-// One donor company's pledge towards a project. `companyIds` is derived from this
-// list server-side (see normalizeProjectCommitments), never taken from the client.
-const projectCommitmentSchema = z.object({
-  companyId: objectId,
-  committedAmount: money.optional().default(0),
-})
-
 export const projectSchema = z
   .object({
     name: z.string().min(1).max(200),
     companyIds: z.array(objectId).min(1, 'Select at least one company'),
-    commitments: z.array(projectCommitmentSchema).optional().default([]),
     category: z.string().max(80).optional().default(''),
     location: z.string().max(160).optional().default(''),
-    // The approved cost of the project. Deliberately NOT forced to equal the sum of
-    // the commitments — an under- or over-funded project is a legitimate state.
+    // The approved cost of the project.
     budget: money.optional().default(0),
     status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).default('active'),
     // Ongoing = end date auto-extends 4 years past the current FY; Other = end date
@@ -130,10 +121,11 @@ export const fundReceiptSchema = z
     path: ['source'],
   })
 
-// Bulk entry: one shared date / financial year / account number, one receipt row per
-// contributing company of the selected project. Each row is a full, independently
-// validated FundReceipt — the records stored are identical to those a one-at-a-time
-// entry would produce, so nothing about the audit trail or reporting changes.
+// Bulk entry: one shared date / financial year, one receipt row per contributing
+// company of the selected project, each with its own account number and amount. Each
+// row is a full, independently validated FundReceipt — the records stored are
+// identical to those a one-at-a-time entry would produce, so nothing about the audit
+// trail or reporting changes.
 export const fundReceiptBulkSchema = z.object({
   receipts: z.array(fundReceiptSchema).min(1, 'Enter an amount for at least one company').max(50),
 })

@@ -53,8 +53,8 @@ export async function snapshot(doc: Record<string, unknown> | null | undefined):
   return out
 }
 
-// Objects and arrays-of-objects (e.g. a project's commitments) all stringify to
-// "[object Object]", which would hide real changes — compare their JSON instead.
+// Objects and arrays-of-objects all stringify to "[object Object]", which would hide
+// real changes — compare their JSON instead.
 const comparable = (v: unknown) =>
   v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')
 

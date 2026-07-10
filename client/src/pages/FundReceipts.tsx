@@ -2,16 +2,17 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
+import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
 import {
   companyService,
   financialYearService,
+  fundReceiptDocumentService,
   fundReceiptService,
   masterDataService,
   projectService,
 } from '../services/dataService'
 import type { FundReceipt, FundReceiptType } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
-import { commitmentStatusForProject } from '../lib/projectContributions'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -40,10 +41,12 @@ const emptyForm = {
   amount: '' as number | string,
   reference: '',
   notes: '',
-  // Amount per contributing company, keyed by company id — used when a project is
-  // chosen and all of its companies are entered together in one go. Each row still
-  // becomes its own FundReceipt record.
+  // Per-contributing-company amount and account number, keyed by company id — used
+  // when a project is chosen and all of its companies are entered together in one go.
+  // Every company banks from its own account, so the account number belongs on the
+  // row, not on the form. Each row still becomes its own FundReceipt record.
   rows: {} as Record<string, string>,
+  refs: {} as Record<string, string>,
 }
 
 export default function FundReceipts() {
@@ -63,8 +66,12 @@ export default function FundReceipts() {
   const [editing, setEditing] = useState<FundReceipt | null>(null)
   const [viewing, setViewing] = useState<FundReceipt | null>(null)
   const [form, setForm] = useState(emptyForm)
+  // Proof of payment staged for a brand-new receipt (no id yet) — uploaded once the
+  // record(s) exist. A batch shares its proof: each receipt gets its own copy.
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
+  const [docUploadWarning, setDocUploadWarning] = useState('')
 
   const companyName = (id?: string) => (id ? companies.find((c) => c.id === id)?.name ?? '—' : '—')
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
@@ -81,16 +88,12 @@ export default function FundReceipts() {
     () => projects.find((p) => p.id === form.projectId),
     [projects, form.projectId],
   )
-  // Pledged vs already-received vs outstanding, per contributing company of the
-  // chosen project — so the amounts can be entered with the gap in plain sight.
-  const projectRows = useMemo(
-    () => (selectedProject ? commitmentStatusForProject(selectedProject, receipts) : []),
-    [selectedProject, receipts],
-  )
+  // The companies funding the chosen project — one entry row each.
+  const projectRows = selectedProject?.companyIds ?? []
   // Picking a project turns the single Donor Company + Amount pair into one row per
   // contributing company. Editing stays single-record — a receipt is one receipt.
   const useGrid = !editing && form.receiptType === 'company' && projectRows.length > 0
-  const gridTotal = projectRows.reduce((s, r) => s + (Number(form.rows[r.companyId]) || 0), 0)
+  const gridTotal = projectRows.reduce((s, id) => s + (Number(form.rows[id]) || 0), 0)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -152,19 +155,35 @@ export default function FundReceipts() {
       source: receiptType === 'other_source' ? sourceOptions[0]?.value ?? '' : '',
       financialYearId: activeYears[0]?.id ?? '',
     })
+    setPendingFiles([])
     setFormError('')
     setOpen(true)
   }
   function openEdit(r: FundReceipt) {
     setEditing(r)
     setForm({ ...emptyForm, ...r })
+    setPendingFiles([])
     setFormError('')
     setOpen(true)
   }
+
+  // Attaches the staged proof to every receipt the entry produced. Failures are
+  // reported rather than thrown — the receipts themselves are already saved.
+  async function uploadProof(receiptIds: string[]) {
+    if (pendingFiles.length === 0) return
+    const jobs = receiptIds.flatMap((id) => pendingFiles.map((file) => fundReceiptDocumentService.upload(id, file)))
+    const failed = (await Promise.allSettled(jobs)).filter((r) => r.status === 'rejected').length
+    if (failed > 0) {
+      setDocUploadWarning(`Receipt saved, but ${failed} of ${jobs.length} document(s) failed to upload.`)
+    }
+    receiptIds.forEach((id) => qc.invalidateQueries({ queryKey: ['fund-receipt-documents', id] }))
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
-    const { rows: gridRows, ...base } = form
+    setDocUploadWarning('')
+    const { rows: gridRows, refs: gridRefs, ...base } = form
     const payload = {
       ...base,
       amount: Number(form.amount),
@@ -177,17 +196,25 @@ export default function FundReceipts() {
         await updateM.mutateAsync({ id: editing.id, data: payload })
       } else if (useGrid) {
         const receiptsToCreate = projectRows
-          .filter((r) => Number(gridRows[r.companyId]) > 0)
-          .map((r) => ({ ...payload, companyId: r.companyId, amount: Number(gridRows[r.companyId]) }))
+          .filter((companyId) => Number(gridRows[companyId]) > 0)
+          .map((companyId) => ({
+            ...payload,
+            companyId,
+            amount: Number(gridRows[companyId]),
+            reference: gridRefs[companyId]?.trim() ?? '',
+          }))
         if (receiptsToCreate.length === 0) {
           setFormError('Enter an amount for at least one company.')
           return
         }
-        await createManyM.mutateAsync(receiptsToCreate)
+        const created = await createManyM.mutateAsync(receiptsToCreate)
+        await uploadProof(created.map((r) => r.id))
       } else {
-        await createM.mutateAsync(payload)
+        const created = await createM.mutateAsync(payload)
+        await uploadProof([created.id])
       }
       setOpen(false)
+      setPendingFiles([])
     } catch (err) {
       setFormError(getErrorMessage(err))
     }
@@ -212,6 +239,10 @@ export default function FundReceipts() {
           )
         }
       />
+
+      {docUploadWarning && (
+        <p className="mb-4 rounded-xl bg-warning/10 px-4 py-2.5 text-sm text-warning">{docUploadWarning}</p>
+      )}
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)}>
@@ -293,7 +324,7 @@ export default function FundReceipts() {
             <Field label="Project">
               <FormSelect
                 value={form.projectId}
-                onChange={(e) => setForm({ ...form, projectId: e.target.value, rows: {} })}
+                onChange={(e) => setForm({ ...form, projectId: e.target.value, rows: {}, refs: {} })}
               >
                 <option value="">No project</option>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -317,43 +348,38 @@ export default function FundReceipts() {
                   <thead>
                     <tr className="text-xs uppercase tracking-wide text-muted">
                       <th className="px-3 py-2 text-left font-medium">Company</th>
-                      <th className="px-3 py-2 text-right font-medium">Committed</th>
-                      <th className="px-3 py-2 text-right font-medium">Received</th>
-                      <th className="px-3 py-2 text-right font-medium">Pending</th>
-                      <th className="px-3 py-2 text-right font-medium">This Receipt</th>
+                      <th className="px-3 py-2 text-left font-medium">Account Number</th>
+                      <th className="px-3 py-2 text-right font-medium">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="text-ink">
-                    {projectRows.map((r) => {
-                      const entered = Number(form.rows[r.companyId]) || 0
-                      return (
-                        <tr key={r.companyId} className="border-t border-line/50">
-                          <td className="px-3 py-2">
-                            {companyName(r.companyId)}
-                            {entered > r.pending && r.committed > 0 && (
-                              <span className="ml-2 text-xs text-warning">over pending</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right text-muted">{formatINR(r.committed)}</td>
-                          <td className="px-3 py-2 text-right text-muted">{formatINR(r.received)}</td>
-                          <td className={`px-3 py-2 text-right ${r.pending > 0 ? 'text-warning' : 'text-muted'}`}>
-                            {r.pending > 0 ? formatINR(r.pending) : '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <input
-                              type="number"
-                              min={0}
-                              placeholder="0"
-                              value={form.rows[r.companyId] ?? ''}
-                              onChange={(e) =>
-                                setForm((f) => ({ ...f, rows: { ...f.rows, [r.companyId]: e.target.value } }))
-                              }
-                              className="w-32 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-right text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
+                    {projectRows.map((companyId) => (
+                      <tr key={companyId} className="border-t border-line/50">
+                        <td className="px-3 py-2">{companyName(companyId)}</td>
+                        <td className="px-3 py-2">
+                          <input
+                            placeholder="Bank account number"
+                            value={form.refs[companyId] ?? ''}
+                            onChange={(e) =>
+                              setForm((f) => ({ ...f, refs: { ...f.refs, [companyId]: e.target.value } }))
+                            }
+                            className="w-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-muted shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder="0"
+                            value={form.rows[companyId] ?? ''}
+                            onChange={(e) =>
+                              setForm((f) => ({ ...f, rows: { ...f.rows, [companyId]: e.target.value } }))
+                            }
+                            className="w-32 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-right text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                          />
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -363,8 +389,24 @@ export default function FundReceipts() {
               </p>
             </div>
           )}
-          <Field label="Account Number">
-            <TextInput placeholder="Bank account number" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+          {/* In grid mode every company banks from its own account, so the number lives on the row. */}
+          {!useGrid && (
+            <Field label="Account Number">
+              <TextInput placeholder="Bank account number" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
+            </Field>
+          )}
+          <Field label="Attach Proof">
+            {editing ? (
+              <DocumentAttachments
+                parentId={editing.id}
+                canWrite={canWrite}
+                allowUpload
+                service={fundReceiptDocumentService}
+                queryKey="fund-receipt-documents"
+              />
+            ) : (
+              <StagedAttachments files={pendingFiles} setFiles={setPendingFiles} />
+            )}
           </Field>
           <Field label="Notes">
             <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
@@ -382,6 +424,19 @@ export default function FundReceipts() {
         open={!!viewing}
         onClose={() => setViewing(null)}
         title={viewing ? `Receipt — ${partyLabel(viewing)}` : 'Fund Receipt'}
+        extra={
+          viewing && (
+            <div className="mt-5">
+              <DocumentAttachments
+                parentId={viewing.id}
+                canWrite={false}
+                allowUpload={false}
+                service={fundReceiptDocumentService}
+                queryKey="fund-receipt-documents"
+              />
+            </div>
+          )
+        }
         rows={
           viewing
             ? [

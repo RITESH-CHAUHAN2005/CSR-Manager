@@ -298,8 +298,8 @@ export function DetailModal({
   title,
   rows = [],
   sections = [],
-  // Full-width content rendered under the key/value grid — for detail that needs a
-  // table rather than a single cell (e.g. a project's per-company commitments).
+  // Full-width content rendered under the key/value grid — for detail that doesn't
+  // fit a single cell (e.g. a fund receipt's attached proof documents).
   extra,
   size,
 }: {

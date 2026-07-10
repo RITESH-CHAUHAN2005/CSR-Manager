@@ -23,7 +23,7 @@ import {
 import { USE_API } from "../services/api";
 import { formatDate, formatINR, formatLakhAxis } from "../lib/currency";
 import { findCurrentFinancialYear } from "../lib/financialYear";
-import { committedTotal, contributionsForProject, receivedTotal } from "../lib/projectContributions";
+import { contributionsForProject, receivedTotal } from "../lib/projectContributions";
 import { CHART_COLORS, colorFor } from "../lib/chartColors";
 import { Card, PageHeader, Select, StatusBadge } from "../components/ui";
 import { DataTable } from "../components/DataTable";
@@ -252,9 +252,8 @@ export default function Reports() {
             company: companyNames,
             period,
             budget: p.budget,
-            // Pledged by the contributing companies vs what has actually landed.
-            // Utilization stays budget-based: it measures the approved cost consumed.
-            committed: committedTotal(p),
+            // What has actually landed against the project. Utilization stays
+            // budget-based: it measures the approved cost consumed.
             received: receivedTotal(p.id, receipts),
             spent,
             utilization: p.budget ? Math.round((spent / p.budget) * 100) : 0,
@@ -501,7 +500,6 @@ export default function Reports() {
           "Company",
           "Period",
           "Budget",
-          "Committed",
           "Received",
           "Spent",
           "Utilization %",
@@ -512,7 +510,6 @@ export default function Reports() {
           r.company,
           r.period,
           r.budget,
-          r.committed,
           r.received,
           r.spent,
           r.utilization,
@@ -743,16 +740,15 @@ export default function Reports() {
                 { data: "company", title: "Company" },
                 { data: "period", title: "Period" },
                 { data: "budget", title: "Budget", className: "text-right", render: money },
-                { data: "committed", title: "Committed", className: "text-right", render: money },
                 { data: "received", title: "Received", className: "text-right", render: money },
                 { data: "spent", title: "Spent", className: "text-right", render: money },
                 { data: "utilization", title: "Utilization", className: "text-right", render: (d, type) => (type === "display" ? d + "%" : d) },
                 { data: "status", title: "Status" },
               ]}
               slots={{
-                5: (_v, row) => <span className="text-success">{formatINR(row.received)}</span>,
-                6: (_v, row) => <span className="text-danger">{formatINR(row.spent)}</span>,
-                8: (_v, row) => <StatusBadge status={row.status} />,
+                4: (_v, row) => <span className="text-success">{formatINR(row.received)}</span>,
+                5: (_v, row) => <span className="text-danger">{formatINR(row.spent)}</span>,
+                7: (_v, row) => <StatusBadge status={row.status} />,
               }}
               options={{ searching: false, order: [] }}
             />

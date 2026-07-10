@@ -21,11 +21,11 @@ Seven collections. Anything an app screen shows is either one of these fields or
 Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one year can be active at the same time** — this is intentional, not a bug.
 
 ### Project
-`name` (required) · `companyIds[]` · `commitments[]` · `budget` · `category` · `location` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `description` · `notes`
+`name` (required) · `companyIds[]` · `budget` · `category` · `location` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `description` · `notes`
 
 - A project is funded by **one or more companies**. There is no financial year on a project.
-- **`commitments`** is the source of truth: `[{ companyId, committedAmount }]` — how much each company has *pledged*. **`companyIds` is derived from it by the server on every write** and must never be trusted from the client.
-- **`budget`** is the project's *approved cost*, stored independently. It is not forced to equal the sum of the commitments — a project can be under- or over-funded, and that gap is a fact to display, not an error to block.
+- **`companyIds`** is just the list of funding companies. The server dedupes it on every write; there is no per-company pledged amount anywhere in the system.
+- **`budget`** is the project's *approved cost*, entered by the user.
 - `status` — `active` | `completed` | `on_hold` | `cancelled`
 - `derivedStatus` — `ongoing` | `other` (shown as "Ongoing" / "Other than Ongoing")
 
@@ -35,7 +35,8 @@ Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one 
 - **`receiptType`** — `company` (a donor company's direct contribution) or `other_source` (income *earned on* that company's funds — Interest, SIP, FD…, picked from Master Data).
 - **`companyId` is required for both types.** Money always arrives on behalf of some company. **[APP TODO]** — the app must not offer a "no company" option.
 - `projectId` is **optional** — money can be received before it is allocated to a project.
-- `reference` is labelled **"Account Number"** in the UI (the field name stays `reference` to avoid a data migration).
+- `reference` is labelled **"Account Number"** in the UI (the field name stays `reference` to avoid a data migration). Each receipt carries its own account number — companies do not share one.
+- A receipt can carry up to **5 proof documents** (photo / PDF / doc / CSV, 8 MB each) — optional. See §8.
 - `mode` (NEFT/RTGS/Cheque) and `carryForward` are **legacy**: still read for historical records, never collected on the form. **[APP TODO]** — remove the Payment Mode dropdown and the Carry Forward field from the receipt form.
 
 ### Expenditure (money out)
@@ -52,20 +53,20 @@ Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one 
 
 ---
 
-## 2. The two money concepts (read this before building any screen)
+## 2. The money concepts (read this before building any screen)
 
 These are constantly confused, and every reporting bug traces back to mixing them up:
 
 | | What it is | Where it lives |
 |---|---|---|
-| **Committed** | What a company *pledged* to a project | `Project.commitments[].committedAmount` |
 | **Received** | What a company *actually paid* | Sum of `FundReceipt.amount` where `projectId` + `companyId` match and `receiptType === 'company'` |
-| **Pending** | Committed − Received, floored at 0 | Derived |
 | **Budget** | The project's approved cost | `Project.budget` |
 | **Spent** | Sum of `Expenditure.amount` for the project | Derived |
-| **Utilization %** | Spent ÷ **Budget** (not ÷ Committed) | Derived |
+| **Utilization %** | Spent ÷ **Budget** | Derived |
 
-An `other_source` receipt is **not** a contribution — it never counts toward "Received" for a company's commitment, even though it does count toward that company's overall `totalReceived` on the Dashboard.
+There is **no "committed"/"pledged" amount** in the system. A project records *which* companies fund it; how much each actually paid comes only from its Fund Receipts.
+
+An `other_source` receipt is **not** a contribution — it never counts toward a project's "Received", even though it does count toward that company's overall `totalReceived` on the Dashboard.
 
 ---
 
@@ -120,33 +121,35 @@ Current Balance = Received + Carry Forward − Expenditure.
 - List with Company filter + free-text search (name, category, location, description, company names).
 - **Add/Edit form:**
   - **Name** (required).
-  - **Companies & Commitments** (required, ≥1): a checkbox list of companies. Ticking one reveals a **₹ amount box** beside it — what that company has committed.
-  - **Approved Budget (₹)** — **auto-fills with the sum of the commitments.** The user never has to type it. If they *do* edit it, a line appears beneath: `Commitments total ₹X · Shortfall ₹Y` (or `Excess`), with a **"Reset to total"** link. Saving is never blocked — an under-funded project is legitimate.
+  - **Companies** (required, ≥1): a plain checkbox list of companies. No per-company amount — that is not a concept in this app.
+  - **Approved Budget (₹)** — typed by the user.
   - **Status**, **Derived Status**, **Category** (from Master Data), **Location**, **Start Date** (required, never in the future), **Description**, **Notes**, **Attach Document**.
   - **End Date is read-only and derived server-side** — see §7.
   - Business rule: `on_hold` or `cancelled` requires a Description or Notes explaining why.
-- **Detail view** shows a per-company reconciliation table — **Company · Committed · Received · Pending** with a totals row, plus the Approved Budget shortfall/excess beneath it.
-- **Delete is blocked while `status === 'active'`** (HTTP 409) — for everyone, including admins. Mark it Completed first.
+- **Delete is blocked while `status === 'active'`** (HTTP 409) — for everyone, including admins. Mark it Completed first. Deleting a project also deletes its attached documents.
 
 ### 5.5 Fund Receipts
 Two entry buttons: **Record Receipt** (`receiptType: 'company'`) and **Receipt From Other Source** (`receiptType: 'other_source'`).
 
-Shared fields: Financial Year (**active years only**), Project (optional), Receipt Date (required, not in the future), Account Number, Notes.
+Shared fields: Financial Year (**active years only**), Project (optional), Receipt Date (required, not in the future), Attach Proof (optional), Notes.
 
-- **Other Source**: adds a required **Source** dropdown (Master Data `source`) and a required **Company** dropdown, plus a single Amount.
-- **Record Receipt with no project selected**: a single **Donor Company** dropdown + a single Amount.
-- **Record Receipt with a project selected** → the form switches to a **per-company grid**:
+- **Other Source**: adds a required **Source** dropdown (Master Data `source`) and a required **Company** dropdown, plus a single Amount and a single Account Number.
+- **Record Receipt with no project selected**: a single **Donor Company** dropdown + a single Amount + a single Account Number.
+- **Record Receipt with a project selected** → the form switches to a **per-company grid**, and the single Account Number field disappears (each company banks from its own account):
 
-  | Company | Committed | Received | Pending | This Receipt |
-  |---|---:|---:|---:|---:|
-  | ABC Ltd | ₹20,00,000 | ₹12,00,000 | ₹8,00,000 | `[______]` |
-  | XYZ Pvt | ₹15,00,000 | ₹15,00,000 | — | `[______]` |
+  | Company | Account Number | Amount |
+  |---|---|---:|
+  | ABC Ltd | `[____________]` | `[______]` |
+  | XYZ Pvt | `[____________]` | `[______]` |
 
-  Fill in whichever companies paid; leave the rest blank. The shared date / FY / account number are entered once at the top. A running **Total** shows under the grid. Entering more than the pending amount shows an *"over pending"* hint but **does not block** — companies do over-pay.
+  Fill in whichever companies paid; leave the rest blank (a blank/zero Amount skips the row entirely). The shared date and financial year are entered once at the top. A running **Total** shows under the grid.
 
-  **Every filled row becomes its own ordinary `FundReceipt` document.** They appear individually in the list and are individually editable and deletable. This is a data-entry shortcut, not a storage change — the audit trail is unaffected.
+  **Every filled row becomes its own ordinary `FundReceipt` document**, with its own account number. They appear individually in the list and are individually editable and deletable. This is a data-entry shortcut, not a storage change — the audit trail is unaffected.
 
-- **Editing** is always single-record, whatever the project.
+  The batch is **all-or-nothing**: if any row fails validation, nothing is written (`POST /fund-receipts/bulk`).
+
+- **Attach Proof** (optional): photo / PDF / doc / CSV, up to 5 files × 8 MB per receipt. On a grid entry, each staged file is attached to **every** receipt the entry creates.
+- **Editing** is always single-record, whatever the project. Deleting a receipt also deletes its proof documents.
 - List columns: Date · Donor Company / Source · Year · Project · Account Number · Amount. Header shows record count + running total, recalculated with the filters (Company, Year, search).
 
 ### 5.6 Expenditures
@@ -168,7 +171,7 @@ Filters: Company, Financial Year. Five tabs:
 1. **Transaction Ledger** — bar chart + table: Type, Date, Company, Project, FY, Base Amount, Carry Forward, running Total Balance.
 2. **Year-wise** — bar (Received / Carry In / Expenditure) + pie (expenditure share). Table: Financial Year, Funds Received, Carry Forward In, Total Available, Expenditure, Balance, Carry Forward Out.
 3. **Company-wise** — bar + pie. Table: Company, Total Received, Carry Forward, Expenditure, Balance, Projects.
-4. **Project-wise** — bar (Budget vs Spent, top 10) + pie (projects by status). Table: **Project, Company, Period, Budget, Committed, Received, Spent, Utilization %, Status**.
+4. **Project-wise** — bar (Budget vs Spent, top 10) + pie (projects by status). Table: **Project, Company, Period, Budget, Received, Spent, Utilization %, Status**.
 5. **Carry Forward** — table: Project, Company, Contribution %, Carry Forward Share, Rolls Into. Only Ongoing projects with carry-forward > 0; the amount is split across contributing companies in proportion to what each actually paid.
 
 **Export**: server-generated **PDF** and **Excel** via `GET /reports/export/{pdf|excel}?type=<tab>`. The website falls back to browser-print / client-side CSV when the API is unavailable; the app should just use the server endpoints and hand the file to the native share sheet.
@@ -180,12 +183,13 @@ Filters: Company, Financial Year. Five tabs:
 - **Activity Logs**: search + filter by action and by user; each row expands to the field-level before→after diff; share a single entry; "Clear Logs" wipes the collection.
 
 ### 5.10 Document attachments
-Supported on **Projects** and **Expenditures**. Bytes are stored in MongoDB (no disk on the free tier).
+Supported on **Projects**, **Expenditures** and **Fund Receipts** (there labelled "Attach Proof"). Bytes are stored in MongoDB (no disk on the free tier). Any file type — photo, PDF, doc, CSV.
 
 - **Max 5 documents per record, max 8 MB each** — enforced on the server (409 / 413).
 - Upload/delete require write permission; **any signed-in role can list and download**.
 - Downloads are served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff` — an uploaded `.svg` or `.html` must never render in-browser.
 - On a *new* record, files are staged locally and uploaded after the record is created; partial upload failures are reported without losing the record.
+- **Deleting the parent record deletes its documents** (server-side cascade) — no orphaned blobs.
 
 **[APP TODO]** — the app has no upload feature at all yet.
 
@@ -206,6 +210,7 @@ GET    /master-data          …
 
 GET    /projects/:id/documents        POST (multipart "file")  GET /:docId/download  DELETE /:docId
 GET    /expenditures/:id/documents    …
+GET    /fund-receipts/:id/documents   …
 
 GET    /dashboard/summary
 GET    /reports/year-wise
@@ -228,7 +233,7 @@ Reads are open to every authenticated role; writes are admin + editor. Every lis
 - **Project `endDate`** is never accepted from the client. The server finds the financial year that the project's **start date** falls into (not today's date, so backdated projects work), then:
   - `derivedStatus === 'ongoing'` → end of the FY **3 years** later.
   - otherwise → end of the FY **1 year** later.
-- **Project `companyIds`** is regenerated from `commitments` on every create and update. Duplicate companies collapse; ordering follows the commitments array.
+- **Project `companyIds`** is deduped on every create and update; blank ids are dropped.
 - **Dashboard and report aggregates** come from `/dashboard/summary`, `/reports/year-wise`, `/reports/company-positions`.
 
 ## 8. Rules the server enforces (and the app must not bypass)

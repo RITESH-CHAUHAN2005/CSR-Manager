@@ -14,6 +14,7 @@ import type {
   DashboardSummary,
   Expenditure,
   ExpenditureDocumentMeta,
+  FundReceiptDocumentMeta,
   FinancialYear,
   FundReceipt,
   MasterDataItem,
@@ -322,6 +323,39 @@ export const projectDocumentService = {
   },
   downloadUrl: (_projectId: string, docId: string) =>
     projectDocuments.find((d) => d.id === docId)?.url ?? '#',
+}
+
+// ---------------- Fund receipt documents (session-only, no real backend) ----------------
+let fundReceiptDocuments: (FundReceiptDocumentMeta & { url: string })[] = []
+
+export const fundReceiptDocumentService = {
+  list: (fundReceiptId: string): Promise<FundReceiptDocumentMeta[]> =>
+    delay(
+      fundReceiptDocuments
+        .filter((d) => d.fundReceiptId === fundReceiptId)
+        .map(({ url: _url, ...meta }) => meta),
+    ),
+  upload: (fundReceiptId: string, file: File): Promise<FundReceiptDocumentMeta> => {
+    const meta = {
+      id: nextId('doc'),
+      fundReceiptId,
+      filename: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size,
+      url: URL.createObjectURL(file),
+    }
+    fundReceiptDocuments.push(meta)
+    const { url: _url, ...rest } = meta
+    return delay(rest)
+  },
+  remove: (fundReceiptId: string, docId: string) => {
+    fundReceiptDocuments = fundReceiptDocuments.filter(
+      (d) => !(d.fundReceiptId === fundReceiptId && d.id === docId),
+    )
+    return delay({ id: docId })
+  },
+  downloadUrl: (_fundReceiptId: string, docId: string) =>
+    fundReceiptDocuments.find((d) => d.id === docId)?.url ?? '#',
 }
 
 // ---------------- Expenditure documents (session-only, no real backend) ----------------

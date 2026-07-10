@@ -85,23 +85,15 @@ export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
 // Other = end date is fixed to the current FY's end date.
 export type DerivedStatus = 'ongoing' | 'other'
 
-// What a company has PLEDGED towards a project — not what it has actually paid,
-// which is derived from its Fund Receipts.
-export interface ProjectCommitment {
-  companyId: string
-  committedAmount: number
-}
-
 export interface Project extends CreatedBy {
   id: string
   name: string
-  // Derived from `commitments` server-side; kept because most readers only need the list.
+  // The companies funding this project. What each has actually paid is derived from
+  // its Fund Receipts, never stored here.
   companyIds: string[]
-  commitments?: ProjectCommitment[]
   category: string // Education, Environment, Skill Development, Healthcare...
   location: string
-  // Approved cost of the project. Defaults to the sum of the commitments but stays
-  // independently editable — an under- or over-funded project is a legitimate state.
+  // Approved cost of the project.
   budget: number
   status: ProjectStatus
   derivedStatus: DerivedStatus
@@ -148,6 +140,19 @@ export interface MasterDataItem {
 export interface ProjectDocumentMeta {
   id: string
   projectId: string
+  filename: string
+  mimeType: string
+  size: number
+  uploadedByName?: string
+  uploadedByEmail?: string
+  createdAt?: string
+}
+
+// ---- Fund receipt document attachments (proof of payment — metadata only) ----
+
+export interface FundReceiptDocumentMeta {
+  id: string
+  fundReceiptId: string
   filename: string
   mimeType: string
   size: number

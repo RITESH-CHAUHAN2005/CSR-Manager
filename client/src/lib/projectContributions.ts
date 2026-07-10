@@ -1,4 +1,4 @@
-import type { FundReceipt, Project } from '../types'
+import type { FundReceipt } from '../types'
 
 export interface ProjectContribution {
   companyId: string
@@ -17,47 +17,7 @@ export function contributionsForProject(projectId: string, receipts: FundReceipt
   return [...totals.entries()].map(([companyId, amount]) => ({ companyId, amount }))
 }
 
-/** Total pledged across all of a project's contributing companies. */
-export function committedTotal(project: Pick<Project, 'commitments'>): number {
-  return (project.commitments ?? []).reduce((s, c) => s + (c.committedAmount || 0), 0)
-}
-
 /** Total actually received against a project, across every company. */
 export function receivedTotal(projectId: string, receipts: FundReceipt[]): number {
   return contributionsForProject(projectId, receipts).reduce((s, c) => s + c.amount, 0)
-}
-
-export interface CommitmentStatus {
-  companyId: string
-  committed: number
-  received: number
-  /** Never negative — an over-payment shows as 0 pending, not as a negative figure. */
-  pending: number
-}
-
-// Per-company reconciliation for one project: pledged vs paid vs outstanding.
-// Every company on the project appears, even one that has paid nothing yet, and
-// any company that has paid without being listed on the project is appended so no
-// money silently disappears from the view.
-export function commitmentStatusForProject(
-  project: Pick<Project, 'id' | 'companyIds' | 'commitments'>,
-  receipts: FundReceipt[],
-): CommitmentStatus[] {
-  const received = new Map(
-    contributionsForProject(project.id, receipts).map((c) => [c.companyId, c.amount]),
-  )
-  const committed = new Map(
-    (project.commitments ?? []).map((c) => [c.companyId, c.committedAmount || 0]),
-  )
-
-  const ordered = [
-    ...(project.companyIds ?? []),
-    ...[...received.keys()].filter((id) => !(project.companyIds ?? []).includes(id)),
-  ]
-
-  return ordered.map((companyId) => {
-    const c = committed.get(companyId) ?? 0
-    const r = received.get(companyId) ?? 0
-    return { companyId, committed: c, received: r, pending: Math.max(0, c - r) }
-  })
 }
