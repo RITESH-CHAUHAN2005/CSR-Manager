@@ -11,6 +11,7 @@ import {
 } from '../services/dataService'
 import type { FundReceipt, FundReceiptType } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
+import { commitmentStatusForProject } from '../lib/projectContributions'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -39,6 +40,10 @@ const emptyForm = {
   amount: '' as number | string,
   reference: '',
   notes: '',
+  // Amount per contributing company, keyed by company id — used when a project is
+  // chosen and all of its companies are entered together in one go. Each row still
+  // becomes its own FundReceipt record.
+  rows: {} as Record<string, string>,
 }
 
 export default function FundReceipts() {
@@ -64,21 +69,28 @@ export default function FundReceipts() {
   const companyName = (id?: string) => (id ? companies.find((c) => c.id === id)?.name ?? '—' : '—')
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
   const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? '—' : '—')
-  // What shows in the "Donor Company / Source" column — depends on how the receipt was recorded.
-  // An 'other_source' receipt can now optionally also be tagged to a company (e.g.
-  // money received from a company before its project has started), so show both.
+  // What shows in the "Donor Company / Source" column. Every receipt carries a company;
+  // an 'other_source' receipt additionally names where the income came from.
   const partyLabel = (r: FundReceipt) => {
     if (r.receiptType !== 'other_source') return companyName(r.companyId)
     const src = r.source || '—'
     return r.companyId ? `${src} — ${companyName(r.companyId)}` : src
   }
 
-  // When the chosen project is linked to more than one company, a "which company"
-  // helper appears below the Project field so the right Donor Company can be picked.
-  const selectedProjectCompanies = useMemo(() => {
-    const proj = projects.find((p) => p.id === form.projectId)
-    return proj?.companyIds ?? []
-  }, [projects, form.projectId])
+  const selectedProject = useMemo(
+    () => projects.find((p) => p.id === form.projectId),
+    [projects, form.projectId],
+  )
+  // Pledged vs already-received vs outstanding, per contributing company of the
+  // chosen project — so the amounts can be entered with the gap in plain sight.
+  const projectRows = useMemo(
+    () => (selectedProject ? commitmentStatusForProject(selectedProject, receipts) : []),
+    [selectedProject, receipts],
+  )
+  // Picking a project turns the single Donor Company + Amount pair into one row per
+  // contributing company. Editing stays single-record — a receipt is one receipt.
+  const useGrid = !editing && form.receiptType === 'company' && projectRows.length > 0
+  const gridTotal = projectRows.reduce((s, r) => s + (Number(form.rows[r.companyId]) || 0), 0)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -109,6 +121,10 @@ export default function FundReceipts() {
     qc.invalidateQueries({ queryKey: ['company-positions'] })
   }
   const createM = useMutation({ mutationFn: (v: Omit<FundReceipt, 'id'>) => fundReceiptService.create(v), onSuccess: invalidate })
+  const createManyM = useMutation({
+    mutationFn: (v: Omit<FundReceipt, 'id'>[]) => fundReceiptService.createMany(v),
+    onSuccess: invalidate,
+  })
   const updateM = useMutation({
     mutationFn: (v: { id: string; data: Partial<FundReceipt> }) => fundReceiptService.update(v.id, v.data),
     onSuccess: invalidate,
@@ -131,7 +147,8 @@ export default function FundReceipts() {
     setForm({
       ...emptyForm,
       receiptType,
-      companyId: receiptType === 'company' ? companies[0]?.id ?? '' : '',
+      // Both receipt types belong to a company, so pre-select one either way.
+      companyId: companies[0]?.id ?? '',
       source: receiptType === 'other_source' ? sourceOptions[0]?.value ?? '' : '',
       financialYearId: activeYears[0]?.id ?? '',
     })
@@ -147,16 +164,29 @@ export default function FundReceipts() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
+    const { rows: gridRows, ...base } = form
     const payload = {
-      ...form,
+      ...base,
       amount: Number(form.amount),
-      // companyId is kept for BOTH types now — an 'other_source' receipt can
-      // optionally tag which company it came from (e.g. before a project starts).
+      // companyId is kept for BOTH types — an 'other_source' receipt records income
+      // earned on a company's funds, so it still belongs to that company.
       source: form.receiptType === 'other_source' ? form.source : '',
     }
     try {
-      if (editing) await updateM.mutateAsync({ id: editing.id, data: payload })
-      else await createM.mutateAsync(payload)
+      if (editing) {
+        await updateM.mutateAsync({ id: editing.id, data: payload })
+      } else if (useGrid) {
+        const receiptsToCreate = projectRows
+          .filter((r) => Number(gridRows[r.companyId]) > 0)
+          .map((r) => ({ ...payload, companyId: r.companyId, amount: Number(gridRows[r.companyId]) }))
+        if (receiptsToCreate.length === 0) {
+          setFormError('Enter an amount for at least one company.')
+          return
+        }
+        await createManyM.mutateAsync(receiptsToCreate)
+      } else {
+        await createM.mutateAsync(payload)
+      }
       setOpen(false)
     } catch (err) {
       setFormError(getErrorMessage(err))
@@ -228,6 +258,7 @@ export default function FundReceipts() {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
+        size={useGrid ? 'lg' : 'md'}
         title={
           editing
             ? 'Edit Receipt'
@@ -238,26 +269,17 @@ export default function FundReceipts() {
       >
         <form onSubmit={submit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {form.receiptType === 'other_source' ? (
-              <>
-                <Field label="Source">
-                  <FormSelect required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
-                    <option value="">Select source</option>
-                    {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
-                  </FormSelect>
-                </Field>
-                <Field label="Company (optional)">
-                  <FormSelect value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
-                    <option value="">No company</option>
-                    {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </FormSelect>
-                  <p className="mt-1 text-xs text-muted">
-                    Tag a company if this money is from them (e.g. received before their project has started).
-                  </p>
-                </Field>
-              </>
-            ) : (
-              <Field label="Donor Company">
+            {form.receiptType === 'other_source' && (
+              <Field label="Source">
+                <FormSelect required value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>
+                  <option value="">Select source</option>
+                  {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
+                </FormSelect>
+              </Field>
+            )}
+            {/* Hidden when a project drives the per-company grid — each row names its own company. */}
+            {!useGrid && (
+              <Field label={form.receiptType === 'other_source' ? 'Company' : 'Donor Company'}>
                 <FormSelect required value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
                   {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </FormSelect>
@@ -269,28 +291,78 @@ export default function FundReceipts() {
               </FormSelect>
             </Field>
             <Field label="Project">
-              <FormSelect value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}>
+              <FormSelect
+                value={form.projectId}
+                onChange={(e) => setForm({ ...form, projectId: e.target.value, rows: {} })}
+              >
                 <option value="">No project</option>
                 {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </FormSelect>
             </Field>
-            {form.receiptType === 'company' && form.projectId && selectedProjectCompanies.length > 1 && (
-              <Field label="Project's Contributing Company">
-                <FormSelect value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })}>
-                  <option value="">Select company</option>
-                  {selectedProjectCompanies.map((cid) => (
-                    <option key={cid} value={cid}>{companyName(cid)}</option>
-                  ))}
-                </FormSelect>
+            {!useGrid && (
+              <Field label="Amount (₹)">
+                <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
               </Field>
             )}
-            <Field label="Amount (₹)">
-              <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-            </Field>
             <Field label="Receipt Date">
               <DatePicker required maxDate="today" value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
             </Field>
           </div>
+
+          {useGrid && (
+            <div>
+              <span className="mb-1.5 block text-sm font-medium text-ink">Amount Received (₹)</span>
+              <div className="overflow-x-auto rounded-xl border border-line bg-surface/60">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-muted">
+                      <th className="px-3 py-2 text-left font-medium">Company</th>
+                      <th className="px-3 py-2 text-right font-medium">Committed</th>
+                      <th className="px-3 py-2 text-right font-medium">Received</th>
+                      <th className="px-3 py-2 text-right font-medium">Pending</th>
+                      <th className="px-3 py-2 text-right font-medium">This Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-ink">
+                    {projectRows.map((r) => {
+                      const entered = Number(form.rows[r.companyId]) || 0
+                      return (
+                        <tr key={r.companyId} className="border-t border-line/50">
+                          <td className="px-3 py-2">
+                            {companyName(r.companyId)}
+                            {entered > r.pending && r.committed > 0 && (
+                              <span className="ml-2 text-xs text-warning">over pending</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right text-muted">{formatINR(r.committed)}</td>
+                          <td className="px-3 py-2 text-right text-muted">{formatINR(r.received)}</td>
+                          <td className={`px-3 py-2 text-right ${r.pending > 0 ? 'text-warning' : 'text-muted'}`}>
+                            {r.pending > 0 ? formatINR(r.pending) : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <input
+                              type="number"
+                              min={0}
+                              placeholder="0"
+                              value={form.rows[r.companyId] ?? ''}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, rows: { ...f.rows, [r.companyId]: e.target.value } }))
+                              }
+                              className="w-32 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-right text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1 flex justify-between text-xs text-muted">
+                <span>Leave a company blank to skip it. Each amount is saved as its own receipt.</span>
+                <span className="font-semibold text-success">Total {formatINR(gridTotal)}</span>
+              </p>
+            </div>
+          )}
           <Field label="Account Number">
             <TextInput placeholder="Bank account number" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
           </Field>
@@ -301,6 +373,7 @@ export default function FundReceipts() {
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setOpen(false)} className="rounded-xl border border-line bg-surface/70 px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5">Cancel</button>
             <button type="submit" className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-dark">{editing ? 'Save Changes' : 'Record'}</button>
+
           </div>
         </form>
       </Modal>

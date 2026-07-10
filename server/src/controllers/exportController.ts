@@ -98,32 +98,39 @@ async function companyReport(): Promise<ReportSpec> {
 }
 
 async function projectReport(): Promise<ReportSpec> {
-  const [projects, companies, expenditures] = await Promise.all([
+  const [projects, companies, expenditures, receipts] = await Promise.all([
     Project.find().sort({ createdAt: 1 }),
     Company.find(),
     Expenditure.find(),
+    FundReceipt.find(),
   ])
   const rows = projects.map((p) => {
     const id = String(p._id)
     const spent = sum(expenditures.filter((e) => String(e.projectId) === id).map((e) => e.amount))
+    // Pledged by the contributing companies vs what has actually landed against
+    // this project. Budget is the approved cost and is tracked separately.
+    const committed = sum((p.commitments ?? []).map((c) => c.committedAmount ?? 0))
+    const received = sum(receipts.filter((r) => String(r.projectId) === id).map((r) => r.amount))
     const companyNames =
       companies
         .filter((c) => p.companyIds.some((cid) => String(cid) === String(c._id)))
         .map((c) => c.name)
         .join(', ') || '—'
     const utilization = p.budget ? Math.round((spent / p.budget) * 100) : 0
-    return [p.name, companyNames, p.budget, spent, utilization, p.status]
+    return [p.name, companyNames, p.budget, committed, received, spent, utilization, p.status]
   })
   return {
     title: 'Project-wise Financial Report',
     filename: 'project-wise-report',
     columns: [
-      { header: 'Project', width: 150, kind: 'text' },
-      { header: 'Company', width: 160, kind: 'text' },
-      { header: 'Budget', width: 105, kind: 'money' },
-      { header: 'Spent', width: 105, kind: 'money' },
-      { header: 'Utilization', width: 90, kind: 'percent' },
-      { header: 'Status', width: 90, kind: 'text' },
+      { header: 'Project', width: 130, kind: 'text' },
+      { header: 'Company', width: 130, kind: 'text' },
+      { header: 'Budget', width: 100, kind: 'money' },
+      { header: 'Committed', width: 100, kind: 'money' },
+      { header: 'Received', width: 100, kind: 'money' },
+      { header: 'Spent', width: 100, kind: 'money' },
+      { header: 'Utilization', width: 80, kind: 'percent' },
+      { header: 'Status', width: 80, kind: 'text' },
     ],
     rows,
   }

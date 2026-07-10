@@ -31,7 +31,13 @@ function crud<T extends { id: string }>(resource: string) {
 export const companyService = crud<Company>('companies')
 export const financialYearService = crud<FinancialYear>('financial-years')
 export const projectService = crud<Project>('projects')
-export const fundReceiptService = crud<FundReceipt>('fund-receipts')
+export const fundReceiptService = {
+  ...crud<FundReceipt>('fund-receipts'),
+  // Records one receipt per contributing company in a single request. The server
+  // validates every row before writing any, so a rejected batch stores nothing.
+  createMany: (receipts: Omit<FundReceipt, 'id'>[]) =>
+    api.post<FundReceipt[]>('/fund-receipts/bulk', { receipts }).then((r) => r.data),
+}
 export const expenditureService = crud<Expenditure>('expenditures')
 export const masterDataService = crud<MasterDataItem>('master-data')
 

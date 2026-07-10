@@ -53,6 +53,11 @@ export async function snapshot(doc: Record<string, unknown> | null | undefined):
   return out
 }
 
+// Objects and arrays-of-objects (e.g. a project's commitments) all stringify to
+// "[object Object]", which would hide real changes — compare their JSON instead.
+const comparable = (v: unknown) =>
+  v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? '')
+
 // Field-level diff between two snapshots (only fields that actually changed).
 export function diff(before: Snapshot, after: Snapshot): FieldChange[] {
   const keys = new Set([...Object.keys(before), ...Object.keys(after)])
@@ -60,7 +65,7 @@ export function diff(before: Snapshot, after: Snapshot): FieldChange[] {
   for (const key of keys) {
     const a = before[key]
     const b = after[key]
-    if (String(a ?? '') !== String(b ?? '')) {
+    if (comparable(a) !== comparable(b)) {
       changes.push({ field: key, from: a ?? null, to: b ?? null })
     }
   }

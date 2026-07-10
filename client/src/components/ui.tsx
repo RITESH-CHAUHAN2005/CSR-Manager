@@ -257,16 +257,21 @@ export function Modal({
   onClose,
   title,
   children,
+  // 'lg' for modals carrying a table (e.g. the per-company receipt grid).
+  size = 'md',
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
+  size?: 'md' | 'lg'
 }) {
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-surface shadow-lift animate-scale-in">
+      <div
+        className={`w-full ${size === 'lg' ? 'max-w-2xl' : 'max-w-lg'} rounded-2xl border border-line bg-surface shadow-lift animate-scale-in`}
+      >
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <h2 className="text-lg font-semibold text-ink">{title}</h2>
           <button
@@ -293,15 +298,21 @@ export function DetailModal({
   title,
   rows = [],
   sections = [],
+  // Full-width content rendered under the key/value grid — for detail that needs a
+  // table rather than a single cell (e.g. a project's per-company commitments).
+  extra,
+  size,
 }: {
   open: boolean
   onClose: () => void
   title: string
   rows?: { label: string; value: ReactNode }[]
   sections?: { label: string; value?: string }[]
+  extra?: ReactNode
+  size?: 'md' | 'lg'
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title}>
+    <Modal open={open} onClose={onClose} title={title} size={size}>
       {rows.length > 0 && (
         <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           {rows.map((r) => (
@@ -312,6 +323,7 @@ export function DetailModal({
           ))}
         </dl>
       )}
+      {extra}
       {sections.length > 0 && (
         <div className="mt-5 space-y-4 border-t border-line/60 pt-4">
           {sections.map((s) => (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
 import {
@@ -9,10 +9,10 @@ import {
   projectDocumentService,
   projectService,
 } from '../services/dataService'
-import type { DerivedStatus, Project, ProjectStatus } from '../types'
+import type { DerivedStatus, FundReceipt, Project, ProjectStatus } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
 import { previewProjectEndDate } from '../lib/financialYear'
-import { contributionsForProject } from '../lib/projectContributions'
+import { commitmentStatusForProject, committedTotal } from '../lib/projectContributions'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
@@ -42,9 +42,75 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
 // On Hold / Cancelled projects must carry a reason (description or notes) for clarity.
 const REASON_REQUIRED: ProjectStatus[] = ['on_hold', 'cancelled']
 
+// Per-company reconciliation shown on a project's detail view: what each donor
+// pledged, what has actually arrived via Fund Receipts, and what's still outstanding.
+function CommitmentTable({
+  project,
+  receipts,
+  companyName,
+}: {
+  project: Project
+  receipts: FundReceipt[]
+  companyName: (id: string) => string
+}) {
+  const rows = commitmentStatusForProject(project, receipts)
+  if (rows.length === 0) return null
+  const totals = rows.reduce(
+    (t, r) => ({ committed: t.committed + r.committed, received: t.received + r.received, pending: t.pending + r.pending }),
+    { committed: 0, received: 0, pending: 0 },
+  )
+  return (
+    <div className="mt-5 border-t border-line/60 pt-4">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Commitments</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs uppercase tracking-wide text-muted">
+              <th className="py-1 text-left font-medium">Company</th>
+              <th className="py-1 text-right font-medium">Committed</th>
+              <th className="py-1 text-right font-medium">Received</th>
+              <th className="py-1 text-right font-medium">Pending</th>
+            </tr>
+          </thead>
+          <tbody className="text-ink">
+            {rows.map((r) => (
+              <tr key={r.companyId} className="border-t border-line/50">
+                <td className="py-1.5 pr-3">{companyName(r.companyId)}</td>
+                <td className="py-1.5 text-right">{formatINR(r.committed)}</td>
+                <td className="py-1.5 text-right text-success">{formatINR(r.received)}</td>
+                <td className={`py-1.5 text-right ${r.pending > 0 ? 'text-warning' : 'text-muted'}`}>
+                  {r.pending > 0 ? formatINR(r.pending) : '—'}
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t border-line font-semibold">
+              <td className="py-1.5 pr-3">Total</td>
+              <td className="py-1.5 text-right">{formatINR(totals.committed)}</td>
+              <td className="py-1.5 text-right text-success">{formatINR(totals.received)}</td>
+              <td className="py-1.5 text-right">{totals.pending > 0 ? formatINR(totals.pending) : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {project.budget !== totals.committed && (
+        <p className="mt-2 text-xs text-muted">
+          Approved Budget {formatINR(project.budget)} ·{' '}
+          <span className="text-warning">
+            {project.budget > totals.committed ? 'Shortfall' : 'Excess'}{' '}
+            {formatINR(Math.abs(project.budget - totals.committed))}
+          </span>
+        </p>
+      )}
+    </div>
+  )
+}
+
 const emptyForm = {
   name: '',
   companyIds: [] as string[],
+  // Per-company pledge, keyed by company id. Held as strings so a half-typed number
+  // input doesn't get coerced to 0 mid-keystroke.
+  amounts: {} as Record<string, string>,
   status: 'active' as ProjectStatus,
   derivedStatus: 'other' as DerivedStatus,
   budget: '' as number | string,
@@ -74,6 +140,9 @@ export default function Projects() {
   const [editing, setEditing] = useState<Project | null>(null)
   const [viewing, setViewing] = useState<Project | null>(null)
   const [form, setForm] = useState(emptyForm)
+  // Once the user types their own Approved Budget we stop auto-filling it from the
+  // commitments — but we keep showing the gap so the override is never silent.
+  const [budgetDirty, setBudgetDirty] = useState(false)
   // Staged for a brand-new project (no id yet) — uploaded once creation succeeds.
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -124,27 +193,62 @@ export default function Projects() {
     [years, form.derivedStatus, form.startDate],
   )
 
+  // What the selected companies have pledged, in total.
+  const committedSum = useMemo(
+    () => form.companyIds.reduce((s, id) => s + (Number(form.amounts[id]) || 0), 0),
+    [form.companyIds, form.amounts],
+  )
+
+  // Approved Budget defaults to the commitments total, so it never has to be typed.
+  // The moment the user edits it themselves we leave it alone.
+  useEffect(() => {
+    if (budgetDirty) return
+    setForm((f) => ({ ...f, budget: committedSum ? String(committedSum) : '' }))
+  }, [committedSum, budgetDirty])
+
+  // Budget above the pledges = a funding shortfall; below = the companies have
+  // over-committed. Neither is an error, so we surface the gap rather than block on it.
+  const budgetGap = (Number(form.budget) || 0) - committedSum
+
   function setDerivedStatus(derivedStatus: DerivedStatus) {
     setForm((f) => ({ ...f, derivedStatus }))
   }
 
   function toggleCompany(id: string, checked: boolean) {
-    setForm((f) => ({
-      ...f,
-      companyIds: checked ? [...f.companyIds, id] : f.companyIds.filter((c) => c !== id),
-    }))
+    setForm((f) => {
+      const amounts = { ...f.amounts }
+      if (!checked) delete amounts[id]
+      return {
+        ...f,
+        amounts,
+        companyIds: checked ? [...f.companyIds, id] : f.companyIds.filter((c) => c !== id),
+      }
+    })
+  }
+
+  function setCommitment(id: string, value: string) {
+    setForm((f) => ({ ...f, amounts: { ...f.amounts, [id]: value } }))
   }
 
   function openAdd() {
     setEditing(null)
     setForm({ ...emptyForm, companyIds: companies[0] ? [companies[0].id] : [] })
+    setBudgetDirty(false)
     setPendingFiles([])
     setFormError('')
     setOpen(true)
   }
   function openEdit(p: Project) {
     setEditing(p)
-    setForm({ ...emptyForm, ...p, companyIds: p.companyIds ?? [] })
+    const amounts: Record<string, string> = {}
+    for (const c of p.commitments ?? []) {
+      if (c.committedAmount) amounts[c.companyId] = String(c.committedAmount)
+    }
+    // Treat an existing budget that doesn't equal the pledges as a deliberate override
+    // (projects created before commitments existed land here), so editing won't quietly
+    // overwrite the approved figure with a commitments total of 0.
+    setBudgetDirty(Number(p.budget) !== committedTotal(p))
+    setForm({ ...emptyForm, ...p, companyIds: p.companyIds ?? [], amounts })
     setPendingFiles([])
     setFormError('')
     setOpen(true)
@@ -164,10 +268,15 @@ export default function Projects() {
       setFormError('Add a description or notes explaining why the project is On Hold or Cancelled.')
       return
     }
-    // The End Date is always derived server-side.
+    // The End Date is always derived server-side, as is companyIds (from commitments).
+    const { amounts, ...rest } = form
     const payload = {
-      ...form,
-      budget: Number(form.budget),
+      ...rest,
+      budget: Number(form.budget) || 0,
+      commitments: form.companyIds.map((companyId) => ({
+        companyId,
+        committedAmount: Number(amounts[companyId]) || 0,
+      })),
     }
     try {
       if (editing) {
@@ -305,22 +414,37 @@ export default function Projects() {
           <Field label="Project Name">
             <TextInput required placeholder="Project name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
-          <Field label="Companies *">
-            <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-line bg-surface/60 p-3">
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-ink">Companies &amp; Commitments *</span>
+            <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-line bg-surface/60 p-3">
               {companies.length === 0 && <p className="text-sm text-muted">No companies yet.</p>}
-              {companies.map((c) => (
-                <Checkbox
-                  key={c.id}
-                  checked={form.companyIds.includes(c.id)}
-                  onChange={(v) => toggleCompany(c.id, v)}
-                  label={c.name}
-                />
-              ))}
+              {companies.map((c) => {
+                const checked = form.companyIds.includes(c.id)
+                return (
+                  <div key={c.id} className="flex items-center justify-between gap-3 py-1">
+                    <Checkbox checked={checked} onChange={(v) => toggleCompany(c.id, v)} label={c.name} />
+                    {checked && (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="text-xs text-muted">₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          placeholder="0"
+                          value={form.amounts[c.id] ?? ''}
+                          onChange={(e) => setCommitment(c.id, e.target.value)}
+                          className="w-36 rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-ink shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/30"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <p className="mt-1 text-xs text-muted">
-              How much each company contributes shows up automatically from its Fund Receipts against this project.
+              How much each company has committed to this project. The Approved Budget below fills in from
+              their total. What each has actually paid comes from its Fund Receipts.
             </p>
-          </Field>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Status">
               <FormSelect value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
@@ -333,9 +457,34 @@ export default function Projects() {
                 <option value="other">Other than Ongoing</option>
               </FormSelect>
             </Field>
-            <Field label="Approved Budget (₹)">
-              <TextInput type="number" min={0} value={form.budget} onChange={(e) => setForm({ ...form, budget: e.target.value })} />
-            </Field>
+            <div>
+              <Field label="Approved Budget (₹)">
+                <TextInput
+                  type="number"
+                  min={0}
+                  value={form.budget}
+                  onChange={(e) => {
+                    setBudgetDirty(true)
+                    setForm({ ...form, budget: e.target.value })
+                  }}
+                />
+              </Field>
+              {committedSum > 0 && budgetGap !== 0 && (
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                  <span>Commitments total {formatINR(committedSum)}</span>
+                  <span className="text-warning">
+                    · {budgetGap > 0 ? 'Shortfall' : 'Excess'} {formatINR(Math.abs(budgetGap))}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setBudgetDirty(false)}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Reset to total
+                  </button>
+                </p>
+              )}
+            </div>
             <Field label="Category">
               <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                 <option value="">Select category</option>
@@ -394,22 +543,13 @@ export default function Projects() {
       <DetailModal
         open={!!viewing}
         onClose={() => setViewing(null)}
+        size="lg"
         title={viewing?.name ?? 'Project'}
+        extra={viewing && <CommitmentTable project={viewing} receipts={receipts} companyName={companyName} />}
         rows={
           viewing
             ? [
                 { label: 'Companies', value: companyNames(viewing.companyIds) },
-                ...(() => {
-                  const contributions = contributionsForProject(viewing.id, receipts)
-                  return contributions.length > 0
-                    ? [{
-                        label: 'Contributions',
-                        value: contributions
-                          .map((c) => `${companyName(c.companyId)}: ${formatINR(c.amount)}`)
-                          .join(', '),
-                      }]
-                    : []
-                })(),
                 { label: 'Status', value: <StatusBadge status={viewing.status} /> },
                 { label: 'Derived Status', value: viewing.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
                 { label: 'Budget', value: formatINR(viewing.budget) },

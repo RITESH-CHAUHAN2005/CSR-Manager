@@ -85,12 +85,23 @@ export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
 // Other = end date is fixed to the current FY's end date.
 export type DerivedStatus = 'ongoing' | 'other'
 
+// What a company has PLEDGED towards a project — not what it has actually paid,
+// which is derived from its Fund Receipts.
+export interface ProjectCommitment {
+  companyId: string
+  committedAmount: number
+}
+
 export interface Project extends CreatedBy {
   id: string
   name: string
+  // Derived from `commitments` server-side; kept because most readers only need the list.
   companyIds: string[]
+  commitments?: ProjectCommitment[]
   category: string // Education, Environment, Skill Development, Healthcare...
   location: string
+  // Approved cost of the project. Defaults to the sum of the commitments but stays
+  // independently editable — an under- or over-funded project is a legitimate state.
   budget: number
   status: ProjectStatus
   derivedStatus: DerivedStatus
@@ -102,15 +113,16 @@ export interface Project extends CreatedBy {
 
 export type PaymentMode = 'NEFT' | 'RTGS' | 'Cheque' | ''
 
-// 'company' = a Donor Company's contribution; 'other_source' = income from a
-// Master Data Source (Interest/SIP/FD…), not tied to a donor company.
+// 'company' = a Donor Company's direct contribution; 'other_source' = income earned
+// on that company's funds via a Master Data Source (Interest/SIP/FD…). Both carry a
+// company — money only ever arrives on behalf of one.
 export type FundReceiptType = 'company' | 'other_source'
 
 export interface FundReceipt extends CreatedBy {
   id: string
   date: string // ISO yyyy-mm-dd
   receiptType: FundReceiptType
-  companyId?: string // required (Donor Company) when receiptType is 'company'; optional tag when 'other_source'
+  companyId?: string // required for both types — money always belongs to a company
   source?: string // Master Data "source" value — set when receiptType is 'other_source'
   financialYearId: string
   projectId?: string // optional link to the project this receipt funds

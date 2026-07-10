@@ -13,8 +13,11 @@ const axios = require('axios')
 const tus = require('tus-js-client')
 
 const TOKEN = process.env.HOSTINGER_API_TOKEN
-const DOMAIN = 'wheat-aardvark-709394.hostingersite.com'
-const ARCHIVE = 'C:/Users/ADMINI~1/AppData/Local/Temp/claude/C--Users-Administrator-Desktop-CSR-Manager-Website/b28780c2-4e23-435b-88fd-63aaf1a37fa6/scratchpad/csr-dist.tar.gz'
+const DOMAIN = process.env.HOSTINGER_DOMAIN || 'wheat-aardvark-709394.hostingersite.com'
+// Path to the built client tarball. Pass as argv[2] or CSR_ARCHIVE — the old
+// hard-coded scratchpad path was gone the moment that session ended.
+const ARCHIVE = process.argv[2] || process.env.CSR_ARCHIVE
+if (!ARCHIVE) { console.error('Usage: node deploy-hostinger.mjs <path-to-dist.tar.gz>'); process.exit(1) }
 const BASE = 'https://developers.hostinger.com/'
 if (!TOKEN) { console.error('Set HOSTINGER_API_TOKEN env var'); process.exit(1) }
 const H = { Authorization: `Bearer ${TOKEN}` }

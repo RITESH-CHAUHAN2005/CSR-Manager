@@ -34,6 +34,7 @@ const FIELD_LABELS: Record<string, string> = {
   isActive: 'Active',
   company: 'Company',
   companyIds: 'Companies',
+  commitments: 'Commitments',
   financialYear: 'Financial Year',
   project: 'Project',
   category: 'Category',
@@ -69,6 +70,13 @@ export function fieldLabel(key: string): string {
 export function formatValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  // A project's per-company pledges — summarized, since the raw ids mean nothing here.
+  if (field === 'commitments' && Array.isArray(value)) {
+    const rows = value as { committedAmount?: number }[]
+    if (rows.length === 0) return '—'
+    const total = rows.reduce((s, r) => s + (Number(r?.committedAmount) || 0), 0)
+    return `${rows.length} ${rows.length === 1 ? 'company' : 'companies'} · ${formatINR(total)}`
+  }
   if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
   if (MONEY_FIELDS.has(field)) {
     const n = Number(value)

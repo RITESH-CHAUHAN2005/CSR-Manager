@@ -53,12 +53,22 @@ export const financialYearSchema = z.object({
   isActive: z.boolean().optional().default(false),
 })
 
+// One donor company's pledge towards a project. `companyIds` is derived from this
+// list server-side (see normalizeProjectCommitments), never taken from the client.
+const projectCommitmentSchema = z.object({
+  companyId: objectId,
+  committedAmount: money.optional().default(0),
+})
+
 export const projectSchema = z
   .object({
     name: z.string().min(1).max(200),
     companyIds: z.array(objectId).min(1, 'Select at least one company'),
+    commitments: z.array(projectCommitmentSchema).optional().default([]),
     category: z.string().max(80).optional().default(''),
     location: z.string().max(160).optional().default(''),
+    // The approved cost of the project. Deliberately NOT forced to equal the sum of
+    // the commitments — an under- or over-funded project is a legitimate state.
     budget: money.optional().default(0),
     status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).default('active'),
     // Ongoing = end date auto-extends 4 years past the current FY; Other = end date
@@ -88,8 +98,9 @@ export const projectSchema = z
 export const fundReceiptSchema = z
   .object({
     date: notFutureDate('Receipt date'),
-    // 'company' = a donor company's contribution (Donor Company field); 'other_source'
-    // = income from a Master Data Source (Interest/SIP/FD…), not tied to a company.
+    // 'company' = a donor company's direct contribution; 'other_source' = income
+    // earned on a company's funds via a Master Data Source (Interest/SIP/FD…).
+    // Either way the money belongs to a company, so companyId is required for both.
     receiptType: z.enum(['company', 'other_source']).default('company'),
     companyId: z.union([objectId, z.literal('')]).optional().default(''),
     source: z.string().max(80).optional().default(''),
@@ -110,14 +121,22 @@ export const fundReceiptSchema = z
     notes: z.string().max(2000).optional().default(''),
   })
   .transform((d) => ({ ...d, companyId: d.companyId || undefined }))
-  .refine((d) => d.receiptType !== 'company' || Boolean(d.companyId), {
-    message: 'Donor Company is required for a company receipt',
+  .refine((d) => Boolean(d.companyId), {
+    message: 'Company is required',
     path: ['companyId'],
   })
   .refine((d) => d.receiptType !== 'other_source' || Boolean(d.source?.trim()), {
     message: 'Source is required for a receipt from another source',
     path: ['source'],
   })
+
+// Bulk entry: one shared date / financial year / account number, one receipt row per
+// contributing company of the selected project. Each row is a full, independently
+// validated FundReceipt — the records stored are identical to those a one-at-a-time
+// entry would produce, so nothing about the audit trail or reporting changes.
+export const fundReceiptBulkSchema = z.object({
+  receipts: z.array(fundReceiptSchema).min(1, 'Enter an amount for at least one company').max(50),
+})
 
 export const masterDataItemSchema = z.object({
   type: z.enum(['category', 'status', 'source']),

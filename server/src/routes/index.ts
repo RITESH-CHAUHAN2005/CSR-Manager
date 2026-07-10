@@ -6,7 +6,9 @@ import logRoutes from './logRoutes.js'
 import { entityRouter } from './entityRouter.js'
 import { blockActiveProjectDelete } from '../middleware/guardProjectDelete.js'
 import { computeProjectDates } from '../middleware/computeProjectDates.js'
+import { normalizeProjectCommitments } from '../middleware/normalizeProjectCommitments.js'
 import { requireActiveFinancialYear } from '../middleware/requireActiveFinancialYear.js'
+import fundReceiptRoutes from './fundReceiptRoutes.js'
 import projectDocumentRoutes from './projectDocumentRoutes.js'
 import expenditureDocumentRoutes from './expenditureDocumentRoutes.js'
 import { Company } from '../models/Company.js'
@@ -45,9 +47,11 @@ api.use(
   '/projects',
   entityRouter(Project, projectSchema, 'project', {
     deleteGuards: [blockActiveProjectDelete],
-    preValidate: [computeProjectDates],
+    preValidate: [normalizeProjectCommitments, computeProjectDates],
   }),
 )
+// /bulk must be mounted before the generic CRUD router.
+api.use('/fund-receipts', fundReceiptRoutes)
 api.use(
   '/fund-receipts',
   entityRouter(FundReceipt, fundReceiptSchema, 'fundReceipt', {

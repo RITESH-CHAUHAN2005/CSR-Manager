@@ -140,6 +140,12 @@ export const fundReceiptService = {
     fundReceipts.push(receipt)
     return delay(receipt)
   },
+  // Mirrors the backend's POST /fund-receipts/bulk — one ordinary receipt per row.
+  createMany: (data: Omit<FundReceipt, 'id'>[]) => {
+    const created = data.map((d) => ({ ...d, id: nextId('r') }))
+    fundReceipts.push(...created)
+    return delay(created)
+  },
   update: (id: string, data: Partial<FundReceipt>) => {
     fundReceipts = fundReceipts.map((r) => (r.id === id ? { ...r, ...data } : r))
     return delay(fundReceipts.find((r) => r.id === id)!)
