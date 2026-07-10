@@ -69,7 +69,10 @@ router.get(
     const doc = await ProjectDocument.findOne({ _id: req.params.docId, projectId: req.params.projectId })
     if (!doc) throw new ApiError(404, 'Not found')
     res.setHeader('Content-Type', doc.mimeType || 'application/octet-stream')
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.filename)}"`)
+    // `attachment`, never `inline`: an uploaded .html/.svg rendered inline would
+    // execute on the API origin, where the auth cookie lives (stored XSS).
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.filename)}"`)
+    res.setHeader('X-Content-Type-Options', 'nosniff')
     res.send(doc.data)
   }),
 )

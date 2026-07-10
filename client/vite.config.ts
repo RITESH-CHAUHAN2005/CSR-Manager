@@ -23,7 +23,6 @@ export default defineConfig({
         // of one monolithic bundle.
         manualChunks: {
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'charts-vendor': ['recharts'],
           'query-vendor': ['@tanstack/react-query', 'axios'],
         },
       },

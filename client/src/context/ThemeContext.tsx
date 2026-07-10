@@ -24,10 +24,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement
-    // Brief opt-out of the global color transition so the very first paint and
-    // the theme flip don't double-animate.
+    // Opt out of the global color transition for the flip itself, so every
+    // surface (sidebar, header, page) repaints in the SAME frame instead of
+    // each easing over 200ms at its own pace. Forcing a reflow commits the new
+    // colors while transitions are off; re-enabling after leaves hover/focus
+    // transitions intact.
+    root.classList.add('no-theme-transition')
     root.classList.toggle('dark', theme === 'dark')
     localStorage.setItem(STORAGE_KEY, theme)
+    void root.offsetHeight
+    root.classList.remove('no-theme-transition')
   }, [theme])
 
   const value: ThemeState = {

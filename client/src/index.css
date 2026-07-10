@@ -27,9 +27,10 @@ body {
   transition-duration: 200ms;
   transition-timing-function: ease;
 }
-/* Don't fight component-level transitions / animations. */
+/* Applied for one frame while the theme flips so every surface repaints at once.
+   The theme toggle itself is exempt — its knob should still slide. */
 .no-theme-transition,
-.no-theme-transition * {
+.no-theme-transition *:not([data-theme-toggle]):not([data-theme-toggle] *) {
   transition: none !important;
 }
 
@@ -37,15 +38,17 @@ body {
   /* Tasteful glassmorphism for cards and panels. */
   .glass-card {
     background-color: rgb(var(--color-surface) / var(--glass-alpha));
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    /* 8px, not 18px: the backdrop is a smooth gradient behind a ~60%-opaque
+       surface, so a wide radius is invisible but recomputes on every scroll frame. */
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
   }
-  /* Subtle hover lift used on interactive cards. */
+  /* Subtle hover lift used on interactive cards. No `will-change` — it would
+     promote every card to its own compositor layer permanently, even at rest. */
   .lift {
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
-    will-change: transform;
   }
   .lift:hover {
     transform: translateY(-3px);

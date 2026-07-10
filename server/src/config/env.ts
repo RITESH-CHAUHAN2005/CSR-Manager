@@ -33,13 +33,14 @@ const PROD_FRONTENDS = ['https://wheat-aardvark-709394.hostingersite.com']
 // Local dev origins (Vite). Only trusted when NOT in production.
 const DEV_FRONTENDS = ['http://localhost:5173', 'http://127.0.0.1:5173']
 
+// In production, CLIENT_ORIGIN is only honoured if it was actually set — otherwise
+// its localhost default would become a credentialed-CORS-allowed origin in prod.
+const configuredOrigins =
+  isProd && !process.env.CLIENT_ORIGIN ? [] : env.CLIENT_ORIGIN.split(',')
+
 export const allowedOrigins = Array.from(
   new Set(
-    [
-      ...env.CLIENT_ORIGIN.split(','),
-      ...PROD_FRONTENDS,
-      ...(isProd ? [] : DEV_FRONTENDS),
-    ]
+    [...configuredOrigins, ...PROD_FRONTENDS, ...(isProd ? [] : DEV_FRONTENDS)]
       .map((o) => o.trim())
       .filter(Boolean),
   ),

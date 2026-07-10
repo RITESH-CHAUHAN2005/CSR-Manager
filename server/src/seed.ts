@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { env } from './config/env.js'
+import { env, isProd } from './config/env.js'
 import { User } from './models/User.js'
 import { Company } from './models/Company.js'
 import { FinancialYear } from './models/FinancialYear.js'
@@ -12,6 +12,15 @@ import { MasterDataItem } from './models/MasterDataItem.js'
 // Same dataset as the frontend mocks — totals match the reference images exactly.
 // Assumes an active mongoose connection (caller connects/disconnects).
 export async function seedDatabase() {
+  // `SEED_ADMIN_PASSWORD` falls back to a well-known value committed to this repo.
+  // That is fine locally, but seeding production with it would leave the admin
+  // account publicly guessable — and seeding also wipes every collection first.
+  if (isProd && !process.env.SEED_ADMIN_PASSWORD) {
+    throw new Error(
+      'Refusing to seed production: set SEED_ADMIN_PASSWORD to something other than the committed default.',
+    )
+  }
+
   console.log('Clearing collections…')
   await Promise.all([
     User.deleteMany({}),
@@ -106,5 +115,5 @@ export async function seedDatabase() {
   ])
 
   console.log('✅ Seed complete (sample data + admin only):')
-  console.log('   Admin —', env.SEED_ADMIN_EMAIL, '/', env.SEED_ADMIN_PASSWORD)
+  console.log('   Admin —', env.SEED_ADMIN_EMAIL, '/', isProd ? '(from SEED_ADMIN_PASSWORD)' : env.SEED_ADMIN_PASSWORD)
 }

@@ -32,6 +32,7 @@ export default function AppLayout() {
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={toggle}
+              data-theme-toggle
               role="switch"
               aria-checked={theme === 'dark'}
               aria-label="Toggle theme"

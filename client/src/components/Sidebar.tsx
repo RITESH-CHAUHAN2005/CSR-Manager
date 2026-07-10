@@ -150,7 +150,9 @@ export default function Sidebar({
 
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-40 flex w-[260px] flex-shrink-0 flex-col border-r border-line bg-sidebar/95 text-muted backdrop-blur-xl transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-2xl lg:shadow-black/10',
+          // No backdrop-blur: at 95% opacity it is invisible, but it forces a
+          // compositing layer that repaints a frame behind the rest of the page.
+          'fixed inset-y-0 left-0 z-40 flex w-[260px] flex-shrink-0 flex-col border-r border-line bg-sidebar text-muted transition-transform duration-300 ease-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-2xl lg:shadow-black/10',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
       >
