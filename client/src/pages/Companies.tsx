@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Pencil, Trash2 } from '../components/icons'
+import { Eye, Pencil, Trash2 } from '../components/icons'
+import { DataTable } from '../components/DataTable'
 import { companyService } from '../services/dataService'
 import type { Company } from '../types'
 import { getErrorMessage } from '../lib/errors'
@@ -16,6 +17,10 @@ import {
   TextArea,
   TextInput,
 } from '../components/ui'
+
+// Blank optional fields read as an em dash rather than an empty cell, while the
+// underlying value is left untouched for sorting/searching.
+const dash = (v: unknown, type: string) => (type === 'display' ? (v ? String(v) : '—') : v)
 
 const empty: Omit<Company, 'id'> = {
   name: '',
@@ -95,6 +100,7 @@ export default function Companies() {
     <>
       <PageHeader
         title="Donor Companies"
+        subtitle={`${filtered.length} ${filtered.length === 1 ? 'company' : 'companies'}`}
         action={canWrite && <PrimaryButton onClick={openAdd}>Add Company</PrimaryButton>}
       />
 
@@ -102,62 +108,45 @@ export default function Companies() {
         <SearchInput value={search} onChange={setSearch} placeholder="Search companies…" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((c) => (
-          <div key={c.id} className="flex flex-col rounded-xl border border-line/70 p-5 transition-colors hover:border-primary/40">
-            <div className="mb-3">
-              <h3 className="text-lg font-semibold text-ink">{c.name}</h3>
-            </div>
-
-            <div className="mb-4 overflow-x-auto rounded-xl border border-line/60">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b border-line/60">
-                    <th className="w-1/3 border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">CIN</th>
-                    <td className="px-3 py-2 text-ink/80">{c.cin || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-line/60">
-                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Contact</th>
-                    <td className="px-3 py-2 text-ink/80">{c.contactPerson || '—'}</td>
-                  </tr>
-                  <tr className="border-b border-line/60">
-                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Email</th>
-                    <td className="px-3 py-2 text-ink/80">{c.email || '—'}</td>
-                  </tr>
-                  <tr>
-                    <th className="border-r border-line/60 bg-ink/[0.03] px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted">Phone</th>
-                    <td className="px-3 py-2 text-ink/80">{c.phone || '—'}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
+      <DataTable
+        data={filtered}
+        columns={[
+          { data: 'name', title: 'Company Name' },
+          { data: 'cin', title: 'CIN', render: dash },
+          { data: 'contactPerson', title: 'Contact Person', render: dash },
+          { data: 'email', title: 'Email', render: dash },
+          { data: 'phone', title: 'Phone', render: dash },
+          { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
+        ]}
+        slots={{
+          0: (_v, row) => (
             <button
-              onClick={() => navigate(`/companies/${c.id}`)}
-              className="mt-auto flex items-center justify-between rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+              onClick={() => navigate(`/companies/${row.id}`)}
+              className="text-left font-medium text-ink hover:text-primary hover:underline"
             >
-              View Details <ChevronRight size={16} />
+              {row.name}
             </button>
-
-            {canWrite && (
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => openEdit(c)}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-line bg-surface/70 px-3 py-2 text-sm font-medium text-ink transition-colors hover:bg-ink/5"
-                >
-                  <Pencil size={15} /> Edit
-                </button>
-                <button
-                  onClick={() => setDeleteId(c.id)}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-danger/30 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
-                >
-                  <Trash2 size={15} /> Delete
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+          ),
+          5: (_v, row) => (
+            <div className="flex justify-end gap-3">
+              <button onClick={() => navigate(`/companies/${row.id}`)} className="text-muted hover:text-primary" title="View details">
+                <Eye size={16} />
+              </button>
+              {canWrite && (
+                <>
+                  <button onClick={() => openEdit(row)} className="text-muted hover:text-primary" title="Edit">
+                    <Pencil size={16} />
+                  </button>
+                  <button onClick={() => setDeleteId(row.id)} className="text-muted hover:text-danger" title="Delete">
+                    <Trash2 size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          ),
+        }}
+        options={{ searching: false, order: [[0, 'asc']] }}
+      />
 
       {/* Add / Edit form */}
       <Modal
