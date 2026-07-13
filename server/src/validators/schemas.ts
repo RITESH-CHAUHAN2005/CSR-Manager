@@ -71,6 +71,13 @@ export const projectSchema = z
     // Start date is mandatory and can never be in the future.
     startDate: notFutureDate('Start date'),
     endDate: z.string().max(20).optional().default(''),
+    // Like endDate, computed by middleware from the start-date FY — not the client.
+    // Empty string (no matching FY) -> undefined so Mongoose doesn't cast '' to an ObjectId.
+    financialYearId: z
+      .union([objectId, z.literal('')])
+      .optional()
+      .default('')
+      .transform((v) => v || undefined),
     notes: z.string().max(2000).optional().default(''),
   })
   // For clarity, an On Hold or Cancelled project must carry a reason in either the

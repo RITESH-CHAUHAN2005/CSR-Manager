@@ -188,12 +188,18 @@ select:-webkit-autofill {
   width: 12px;
 }
 .select2-container--default .select2-selection--single .select2-selection__arrow b {
-  border: none;
-  margin: 0;
-  width: 8px;
-  height: 8px;
-  border-right: 1.5px solid rgb(var(--color-muted));
-  border-bottom: 1.5px solid rgb(var(--color-muted));
+  /* select2.min.css loads after this file, so its left/top/margins on this element
+     need overriding with !important — otherwise the chevron sits off-centre and tilts. */
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  margin: 0 !important;
+  width: 7px !important;
+  height: 7px !important;
+  border: none !important;
+  border-right: 1.5px solid rgb(var(--color-muted)) !important;
+  border-bottom: 1.5px solid rgb(var(--color-muted)) !important;
+  box-sizing: border-box;
   transform: translate(-50%, -70%) rotate(45deg);
   transition: transform 0.15s ease;
 }

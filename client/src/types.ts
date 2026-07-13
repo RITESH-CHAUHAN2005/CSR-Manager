@@ -100,6 +100,7 @@ export interface Project extends CreatedBy {
   description: string
   startDate?: string
   endDate?: string // computed server-side, not user-editable
+  financialYearId?: string // the FY the start date falls into; derived server-side
   notes?: string
 }
 

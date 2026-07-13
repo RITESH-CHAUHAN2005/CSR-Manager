@@ -21,9 +21,10 @@ Seven collections. Anything an app screen shows is either one of these fields or
 Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one year can be active at the same time** — this is intentional, not a bug.
 
 ### Project
-`name` (required) · `companyIds[]` · `budget` · `category` · `location` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `description` · `notes`
+`name` (required) · `companyIds[]` · `budget` · `category` · `location` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `financialYearId` · `description` · `notes`
 
-- A project is funded by **one or more companies**. There is no financial year on a project.
+- A project is funded by **one or more companies**.
+- **`financialYearId`** is the financial year the project belongs to. It is **not entered by the user** — the server sets it automatically to the FY the **start date** falls into (the same FY used to derive `endDate`). Read-only; shown auto-filled on the form. **[APP TODO]** — show a read-only "Financial Year" field on the Project form and a "FY" line in the list/detail; never let the user type it.
 - **`companyIds`** is just the list of funding companies. The server dedupes it on every write; there is no per-company pledged amount anywhere in the system.
 - **`budget`** is the project's *approved cost*, entered by the user.
 - `status` — `active` | `completed` | `on_hold` | `cancelled`
@@ -124,7 +125,9 @@ Current Balance = Received + Carry Forward − Expenditure.
   - **Companies** (required, ≥1): a plain checkbox list of companies. No per-company amount — that is not a concept in this app.
   - **Approved Budget (₹)** — typed by the user.
   - **Status**, **Derived Status**, **Category** (from Master Data), **Location**, **Start Date** (required, never in the future), **Description**, **Notes**, **Attach Document**.
+  - **Financial Year is read-only and auto-filled** from the FY the Start Date falls into — see §7. It updates live as the Start Date changes; the user never picks it.
   - **End Date is read-only and derived server-side** — see §7.
+  - The list row and detail view each show the project's **FY**.
   - Business rule: `on_hold` or `cancelled` requires a Description or Notes explaining why.
 - **Delete is blocked while `status === 'active'`** (HTTP 409) — for everyone, including admins. Mark it Completed first. Deleting a project also deletes its attached documents.
 
@@ -230,9 +233,10 @@ Reads are open to every authenticated role; writes are admin + editor. Every lis
 
 ## 7. Server-derived values — do not compute these in the app
 
-- **Project `endDate`** is never accepted from the client. The server finds the financial year that the project's **start date** falls into (not today's date, so backdated projects work), then:
-  - `derivedStatus === 'ongoing'` → end of the FY **3 years** later.
-  - otherwise → end of the FY **1 year** later.
+- **Project `endDate` and `financialYearId`** are never accepted from the client. The server finds the financial year that the project's **start date** falls into (not today's date, so backdated projects work), and:
+  - sets `financialYearId` to that FY.
+  - sets `endDate`: `derivedStatus === 'ongoing'` → end of the FY **3 years** later; otherwise → end of the FY **1 year** later.
+  - If no known FY contains the start date, both are left empty.
 - **Project `companyIds`** is deduped on every create and update; blank ids are dropped.
 - **Dashboard and report aggregates** come from `/dashboard/summary`, `/reports/year-wise`, `/reports/company-positions`.
 

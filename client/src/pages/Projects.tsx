@@ -10,7 +10,7 @@ import {
 } from '../services/dataService'
 import type { DerivedStatus, Project, ProjectStatus } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
-import { previewProjectEndDate } from '../lib/financialYear'
+import { findCurrentFinancialYear, previewProjectEndDate } from '../lib/financialYear'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
@@ -80,6 +80,10 @@ export default function Projects() {
 
   const companyName = (id: string) => companies.find((c) => c.id === id)?.name ?? '—'
   const companyNames = (ids: string[] = []) => ids.map(companyName).join(', ') || '—'
+  // The FY a project belongs to = the year its Start Date falls into. Derived here
+  // (not read from the stored financialYearId) so it also shows for older projects
+  // saved before the field existed. Server keeps the two in sync on every write.
+  const fyName = (p: Project) => findCurrentFinancialYear(years, p.startDate || undefined)?.name ?? '—'
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -119,6 +123,12 @@ export default function Projects() {
   const endDatePreview = useMemo(
     () => previewProjectEndDate(years, form.derivedStatus, form.startDate),
     [years, form.derivedStatus, form.startDate],
+  )
+  // The FY the chosen Start Date falls into — shown read-only, auto-filled. The
+  // server derives and stores the same value, so the user never types it.
+  const fyPreview = useMemo(
+    () => findCurrentFinancialYear(years, form.startDate || undefined)?.name ?? '',
+    [years, form.startDate],
   )
 
   function setDerivedStatus(derivedStatus: DerivedStatus) {
@@ -243,6 +253,7 @@ export default function Projects() {
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
                 <span>Companies: <span className="text-ink/80">{companyNames(p.companyIds)}</span></span>
+                <span>FY: <span className="text-ink/80">{fyName(p)}</span></span>
                 {p.category && <span>Category: <span className="text-ink/80">{p.category}</span></span>}
                 {p.location && <span>Location: <span className="text-ink/80">{p.location}</span></span>}
                 <span>Budget: <span className="text-ink/80">{formatINR(p.budget)}</span></span>
@@ -352,6 +363,14 @@ export default function Projects() {
             <Field label="Start Date *">
               <DatePicker required maxDate="today" value={form.startDate} onChange={(iso) => setForm({ ...form, startDate: iso })} />
             </Field>
+            <Field label="Financial Year (auto)">
+              <TextInput
+                value={fyPreview || '—'}
+                readOnly
+                disabled
+                title="Set automatically from the financial year your Start Date falls into."
+              />
+            </Field>
             <Field label="End Date (auto)">
               <TextInput value={endDatePreview ? formatDate(endDatePreview) : '—'} readOnly disabled />
             </Field>
@@ -402,6 +421,7 @@ export default function Projects() {
                 { label: 'Companies', value: companyNames(viewing.companyIds) },
                 { label: 'Status', value: <StatusBadge status={viewing.status} /> },
                 { label: 'Derived Status', value: viewing.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
+                { label: 'Financial Year', value: fyName(viewing) },
                 { label: 'Budget', value: formatINR(viewing.budget) },
                 { label: 'Category', value: viewing.category },
                 { label: 'Location', value: viewing.location },

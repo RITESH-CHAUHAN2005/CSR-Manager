@@ -29,6 +29,7 @@ import {
   fundReceipts as seedFundReceipts,
   projects as seedProjects,
 } from '../mocks/seedData'
+import { findCurrentFinancialYear, shiftIsoYears } from '../lib/financialYear'
 
 // Mutable in-memory stores (deep-cloned so we never mutate the seed module).
 const clone = <T,>(arr: T[]): T[] => arr.map((x) => ({ ...x }))
@@ -108,16 +109,29 @@ export const financialYearService = {
   },
 }
 
+// The server derives endDate + financialYearId from the FY the start date falls
+// into (computeProjectDates middleware). Mirror that here so mock mode matches.
+function deriveProjectDates<T extends Partial<Project>>(data: T): T {
+  const startFy = findCurrentFinancialYear(financialYears, data.startDate || undefined)
+  if (!startFy) return { ...data, financialYearId: undefined }
+  return {
+    ...data,
+    financialYearId: startFy.id,
+    endDate: shiftIsoYears(startFy.endDate, data.derivedStatus === 'ongoing' ? 3 : 1),
+  }
+}
+
 // ---------------- Projects ----------------
 export const projectService = {
   list: () => delay(clone(projects)),
   create: (data: Omit<Project, 'id'>) => {
-    const project = { ...data, id: nextId('p') }
+    const project = { ...deriveProjectDates(data), id: nextId('p') }
     projects.push(project)
     return delay(project)
   },
   update: (id: string, data: Partial<Project>) => {
-    projects = projects.map((p) => (p.id === id ? { ...p, ...data } : p))
+    const patch = deriveProjectDates(data)
+    projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
     return delay(projects.find((p) => p.id === id)!)
   },
   remove: (id: string) => {
