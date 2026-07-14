@@ -122,10 +122,13 @@ function EmptyChartNote({ text = "No data to display yet." }: { text?: string })
   return <div className="flex h-full items-center justify-center text-sm text-muted">{text}</div>;
 }
 
-// The bar that sits above every report table: whatever context the tab wants to show on
-// the left (totals, an explanatory line), and the search box on the right. Replaces
-// DataTables' own stock search field, which floats unstyled above the header row and
-// looks nothing like the rest of the app.
+// The bar that sits above every report table, replacing DataTables' own stock search
+// field (which floats unstyled above the header row and looks nothing like the rest of
+// the app).
+//
+// The search box goes top-LEFT, on its own line. The tab's totals and explanation then
+// get the full width underneath — squeezing them into the column left over beside a
+// right-hand search box wrapped them into an unreadable mess.
 function TableToolbar({
   value,
   onChange,
@@ -138,11 +141,11 @@ function TableToolbar({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex flex-col gap-4 border-b border-line/60 px-1 pb-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-      <div className="min-w-0 flex-1 text-sm text-muted">{children}</div>
-      <div className="w-full shrink-0 lg:w-72">
+    <div className="mb-5 border-b border-line/60 px-1 pb-5">
+      <div className="w-full sm:w-80">
         <SearchInput value={value} onChange={onChange} placeholder={placeholder} />
       </div>
+      {children && <div className="mt-4 text-sm leading-relaxed text-muted">{children}</div>}
     </div>
   );
 }
@@ -665,12 +668,12 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-4 sm:p-5">
+            <Card className="p-5 sm:p-6">
               <TableToolbar value={search} onChange={setSearch} placeholder="Search year…">
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
                   Total Received: <span className="font-semibold text-ink">{formatINR(yearTotals.fundsReceived)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(yearTotals.expenditure)}</span> · Closing Balance: <span className="font-semibold text-success">{formatINR(yearTotals.balance)}</span>
                 </div>
-                <p className="mt-1 text-xs">
+                <p className="mt-2">
                   Each year's closing balance becomes the next year's Carry Forward In, so{" "}
                   {yearRows.at(-1)?.name ?? "the last year"}'s Carry Forward Out ({formatINR(yearTotals.carryForwardOut)})
                   is the money still in hand.
@@ -721,12 +724,12 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-4 sm:p-5">
+            <Card className="p-5 sm:p-6">
               <TableToolbar value={search} onChange={setSearch} placeholder="Search company…">
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
                   Total Received: <span className="font-semibold text-ink">{formatINR(companyTotals.received)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(companyTotals.expenditure)}</span> · Balance: <span className="font-semibold text-success">{formatINR(companyTotals.balance)}</span> · Carry Forward: <span className="font-semibold text-ink">{formatINR(companyTotals.carry)}</span>
                 </div>
-                <p className="mt-1 text-xs">
+                <p className="mt-2">
                   Balance is what came in minus what went out. Carry Forward is the slice of that
                   balance still unspent on the company's Ongoing projects, which rolls into {rollsIntoFy}.
                 </p>
@@ -777,7 +780,7 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-4 sm:p-5">
+            <Card className="p-5 sm:p-6">
               <TableToolbar value={search} onChange={setSearch}>
                 {projectRows.length} project{projectRows.length === 1 ? "" : "s"} · Utilization is
                 Spent ÷ Budget, so it measures the approved cost consumed — not the money received.
@@ -827,7 +830,7 @@ export default function Reports() {
               </p>
             )}
 
-            <Card className="p-4 sm:p-5">
+            <Card className="p-5 sm:p-6">
               {cfRows.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted">
                   No Ongoing project has any funds received or spent against it yet.
@@ -898,7 +901,7 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-4 sm:p-5">
+            <Card className="p-5 sm:p-6">
               <TableToolbar value={search} onChange={setSearch} placeholder="Search ledger…">
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
                   Total Receipts: <span className="font-semibold text-success">{formatINR(ledgerTotals.totalReceipts)}</span> · Total Expenditures: <span className="font-semibold text-danger">{formatINR(ledgerTotals.totalExpenditures)}</span> · Net Balance: <span className="font-semibold text-ink">{formatINR(ledgerTotals.netBalance)}</span>

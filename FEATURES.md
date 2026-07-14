@@ -45,7 +45,7 @@ Nothing was lost: the migration folded old `category` and `notes` text into each
 | 14 | **Non-Ongoing projects end WITH their start FY** | Was: start FY + 1 year. Now: that FY's own end date. Server-derived either way. |
 | 15 | **Master Data Categories are the 12 Schedule VII heads** | Exactly 12, (i)–(xii). Clause (ix)'s two limbs are one category. Every other category value was deleted and the projects using them remapped. |
 | 16 | **No cap on attachment count** | Was 5 per record. Now unlimited, multi-select picker. Per-file cap is **15 MB** (was 8 MB) and **cannot be lifted** — see §5.10. |
-| 17 | **Every Reports tab has a search box** | Searchable by Project ID, project name, company name. |
+| 17 | **Every Reports tab has a search box** | Top-left, above the table, on its own line. Matches any text column (Project ID / project / company). Filters the table only, not the charts. See §5.8 for the exact layout. |
 
 ### 0.4 Things that were built and then removed — do NOT build them
 
@@ -263,7 +263,28 @@ The **Category** list holds the **12** statutory **Schedule VII** activity heads
 **[APP TODO]** — this screen does not exist in the app yet.
 
 ### 5.8 Reports
-Filters: Company, Financial Year — plus a **search box on every tab's table**, so a row can be found by Project ID, project name or company name. Five tabs:
+Filters: **Company** and **Financial Year** dropdowns at the top of the page, which drive the charts, the totals and the tables on every tab.
+
+**Every tab's table also has its own search box**, laid out like this:
+
+```
+┌─ table card ───────────────────────────────────────────────┐
+│  [ 🔍 Search… ]                          ← top-LEFT, on its │
+│                                            own line         │
+│  Total Received: ₹1,48,02,937 · Expenditure: ₹67,36,910 …  │  ← totals, full width
+│  Each year's closing balance becomes the next year's …      │  ← explanation, full width
+│  ─────────────────────────────────────────────────────────  │
+│  FINANCIAL YEAR │ FUNDS RECEIVED │ CARRY FORWARD IN │ …     │
+└────────────────────────────────────────────────────────────┘
+```
+
+- The search box sits **top-left, above the table, on its own line** — not beside the totals. Giving the totals and the explanatory line the full width is what keeps them readable; squeezing them into the space left over next to a right-hand search box wraps them into a mess.
+- It matches **any text column** on the row, so a Project ID, a project name and a company name all work without the user having to pick which field they meant.
+- It **filters the table only**. The charts and the totals keep reflecting the Company/Year dropdowns, so the overview doesn't shift on every keystroke.
+- It is **cleared when the tab changes** — each tab searches different columns, so a carried-over query just looks broken.
+- **[APP TODO]** — the app should do the same rather than use a table library's stock search field.
+
+Five tabs:
 
 1. **Transaction Ledger** — bar chart + table: Type, Date, **Project ID**, Project, Company, FY, Amount, running Balance.
 2. **Year-wise** — bar (Received / Carry In / Expenditure) + pie (expenditure share). Table: Financial Year, Funds Received, Carry Forward In, Total Available, Expenditure, Balance, Carry Forward Out. Each year's closing balance is the next year's Carry Forward In, so those columns are running positions — **do not sum them down the column**.
