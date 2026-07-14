@@ -26,7 +26,7 @@ import { findCurrentFinancialYear } from "../lib/financialYear";
 import { carryForwardByCompany, carryForwardRows, rollsIntoYear, yearFundFlow } from "../lib/carryForward";
 import { receivedTotal } from "../lib/projectContributions";
 import { CHART_COLORS, colorFor } from "../lib/chartColors";
-import { Card, PageHeader, Select, StatusBadge } from "../components/ui";
+import { Card, PageHeader, SearchInput, Select, StatusBadge } from "../components/ui";
 import { DataTable } from "../components/DataTable";
 import { downloadCsv, printReport, saveBlob } from "../lib/exporters";
 
@@ -122,6 +122,31 @@ function EmptyChartNote({ text = "No data to display yet." }: { text?: string })
   return <div className="flex h-full items-center justify-center text-sm text-muted">{text}</div>;
 }
 
+// The bar that sits above every report table: whatever context the tab wants to show on
+// the left (totals, an explanatory line), and the search box on the right. Replaces
+// DataTables' own stock search field, which floats unstyled above the header row and
+// looks nothing like the rest of the app.
+function TableToolbar({
+  value,
+  onChange,
+  placeholder = "Search Project ID or name…",
+  children,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex flex-col gap-4 border-b border-line/60 px-1 pb-4 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+      <div className="min-w-0 flex-1 text-sm text-muted">{children}</div>
+      <div className="w-full shrink-0 lg:w-72">
+        <SearchInput value={value} onChange={onChange} placeholder={placeholder} />
+      </div>
+    </div>
+  );
+}
+
 export default function Reports() {
   const { data: companies = [] } = useQuery({
     queryKey: ["companies"],
@@ -147,7 +172,20 @@ export default function Reports() {
   const [tab, setTab] = useState<Tab>("year");
   const [companyFilter, setCompanyFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [exporting, setExporting] = useState<"pdf" | "excel" | null>(null);
+
+  // The search box narrows the table you're looking at — the charts and the totals keep
+  // reflecting the Company/Year filters, so the overview doesn't shift under you on every
+  // keystroke. Matches any text field on the row, so a Project ID, a project name and a
+  // company name all work without the user having to say which one they meant.
+  function findRows<T extends object>(rows: T[]): T[] {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) =>
+      Object.values(row).some((v) => typeof v === "string" && v.toLowerCase().includes(q)),
+    );
+  }
 
   const fr = useMemo(
     () =>
@@ -525,7 +563,12 @@ export default function Reports() {
 
   const tabBtn = (id: Tab, label: string) => (
     <button
-      onClick={() => setTab(id)}
+      // Each tab searches different columns, so a query carried over from the last tab
+      // would just look broken. Start clean.
+      onClick={() => {
+        setTab(id);
+        setSearch("");
+      }}
       className={[
         "border-b-2 px-4 py-2.5 text-sm font-medium transition-colors",
         tab === id
@@ -622,17 +665,19 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-2 sm:p-4">
-              <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                Total Received: <span className="font-semibold text-ink">{formatINR(yearTotals.fundsReceived)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(yearTotals.expenditure)}</span> · Closing Balance: <span className="font-semibold text-success">{formatINR(yearTotals.balance)}</span>
-              </div>
-              <p className="mb-3 text-xs text-muted">
-                Each year's closing balance becomes the next year's Carry Forward In, so{" "}
-                {yearRows.at(-1)?.name ?? "the last year"}'s Carry Forward Out ({formatINR(yearTotals.carryForwardOut)})
-                is the money still in hand.
-              </p>
+            <Card className="p-4 sm:p-5">
+              <TableToolbar value={search} onChange={setSearch} placeholder="Search year…">
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  Total Received: <span className="font-semibold text-ink">{formatINR(yearTotals.fundsReceived)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(yearTotals.expenditure)}</span> · Closing Balance: <span className="font-semibold text-success">{formatINR(yearTotals.balance)}</span>
+                </div>
+                <p className="mt-1 text-xs">
+                  Each year's closing balance becomes the next year's Carry Forward In, so{" "}
+                  {yearRows.at(-1)?.name ?? "the last year"}'s Carry Forward Out ({formatINR(yearTotals.carryForwardOut)})
+                  is the money still in hand.
+                </p>
+              </TableToolbar>
               <DataTable
-                data={yearRows}
+                data={findRows(yearRows)}
                 columns={[
                   { data: "name", title: "Financial Year" },
                   { data: "fundsReceived", title: "Funds Received", className: "text-right", render: money },
@@ -646,7 +691,7 @@ export default function Reports() {
                   4: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
                   5: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
                 }}
-                options={{ searching: true, order: [] }}
+                options={{ searching: false, order: [] }}
               />
             </Card>
           </>
@@ -676,16 +721,18 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-2 sm:p-4">
-              <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                Total Received: <span className="font-semibold text-ink">{formatINR(companyTotals.received)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(companyTotals.expenditure)}</span> · Balance: <span className="font-semibold text-success">{formatINR(companyTotals.balance)}</span> · Carry Forward: <span className="font-semibold text-ink">{formatINR(companyTotals.carry)}</span>
-              </div>
-              <p className="mb-3 text-xs text-muted">
-                Balance is what came in minus what went out. Carry Forward is the slice of that
-                balance still unspent on the company's Ongoing projects, which rolls into {rollsIntoFy}.
-              </p>
+            <Card className="p-4 sm:p-5">
+              <TableToolbar value={search} onChange={setSearch} placeholder="Search company…">
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  Total Received: <span className="font-semibold text-ink">{formatINR(companyTotals.received)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(companyTotals.expenditure)}</span> · Balance: <span className="font-semibold text-success">{formatINR(companyTotals.balance)}</span> · Carry Forward: <span className="font-semibold text-ink">{formatINR(companyTotals.carry)}</span>
+                </div>
+                <p className="mt-1 text-xs">
+                  Balance is what came in minus what went out. Carry Forward is the slice of that
+                  balance still unspent on the company's Ongoing projects, which rolls into {rollsIntoFy}.
+                </p>
+              </TableToolbar>
               <DataTable
-                data={companyRows}
+                data={findRows(companyRows)}
                 columns={[
                   { data: "name", title: "Company" },
                   { data: "received", title: "Total Received", className: "text-right", render: money },
@@ -698,7 +745,7 @@ export default function Reports() {
                   2: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
                   3: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
                 }}
-                options={{ searching: true, order: [] }}
+                options={{ searching: false, order: [] }}
               />
             </Card>
           </>
@@ -730,9 +777,13 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-2 sm:p-4">
+            <Card className="p-4 sm:p-5">
+              <TableToolbar value={search} onChange={setSearch}>
+                {projectRows.length} project{projectRows.length === 1 ? "" : "s"} · Utilization is
+                Spent ÷ Budget, so it measures the approved cost consumed — not the money received.
+              </TableToolbar>
               <DataTable
-                data={projectRows}
+                data={findRows(projectRows)}
                 columns={[
                   { data: "code", title: "Project ID" },
                   { data: "name", title: "Project" },
@@ -751,7 +802,7 @@ export default function Reports() {
                   7: (_v, row) => <span className="text-danger">{formatINR(row.spent)}</span>,
                   9: (_v, row) => <StatusBadge status={row.status} />,
                 }}
-                options={{ searching: true, order: [] }}
+                options={{ searching: false, order: [] }}
               />
             </Card>
           </>
@@ -776,18 +827,20 @@ export default function Reports() {
               </p>
             )}
 
-            <Card className="p-2 sm:p-4">
+            <Card className="p-4 sm:p-5">
               {cfRows.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted">
                   No Ongoing project has any funds received or spent against it yet.
                 </p>
               ) : (
                 <>
-                  <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                    Received: <span className="font-semibold text-success">{formatINR(cfTotals.received)}</span> · Spent: <span className="font-semibold text-danger">{formatINR(cfTotals.spent)}</span> · Carrying Forward: <span className="font-semibold text-ink">{formatINR(cfTotals.carryForward)}</span>
-                  </div>
+                  <TableToolbar value={search} onChange={setSearch}>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1">
+                      Received: <span className="font-semibold text-success">{formatINR(cfTotals.received)}</span> · Spent: <span className="font-semibold text-danger">{formatINR(cfTotals.spent)}</span> · Carrying Forward: <span className="font-semibold text-ink">{formatINR(cfTotals.carryForward)}</span>
+                    </div>
+                  </TableToolbar>
                   <DataTable
-                    data={cfRows}
+                    data={findRows(cfRows)}
                     columns={[
                       { data: "projectCode", title: "Project ID" },
                       { data: "projectName", title: "Project" },
@@ -816,7 +869,7 @@ export default function Reports() {
                         ),
                       5: (_v, row) => <span className="font-semibold text-success">{formatINR(row.carryForward)}</span>,
                     }}
-                    options={{ searching: true, order: [] }}
+                    options={{ searching: false, order: [] }}
                   />
                 </>
               )}
@@ -845,12 +898,14 @@ export default function Reports() {
               </ChartCard>
             </div>
 
-            <Card className="p-2 sm:p-4">
-              <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted">
-                Total Receipts: <span className="font-semibold text-success">{formatINR(ledgerTotals.totalReceipts)}</span> · Total Expenditures: <span className="font-semibold text-danger">{formatINR(ledgerTotals.totalExpenditures)}</span> · Net Balance: <span className="font-semibold text-ink">{formatINR(ledgerTotals.netBalance)}</span>
-              </div>
+            <Card className="p-4 sm:p-5">
+              <TableToolbar value={search} onChange={setSearch} placeholder="Search ledger…">
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  Total Receipts: <span className="font-semibold text-success">{formatINR(ledgerTotals.totalReceipts)}</span> · Total Expenditures: <span className="font-semibold text-danger">{formatINR(ledgerTotals.totalExpenditures)}</span> · Net Balance: <span className="font-semibold text-ink">{formatINR(ledgerTotals.netBalance)}</span>
+                </div>
+              </TableToolbar>
               <DataTable
-                data={ledgerRows}
+                data={findRows(ledgerRows)}
                 columns={[
                   { data: "type", title: "Type" },
                   { data: "date", title: "Date", render: dateCell },
@@ -874,7 +929,7 @@ export default function Reports() {
                   ),
                   7: (_v, row) => <span className="font-semibold text-ink">{formatINR(row.runningBalance)}</span>,
                 }}
-                options={{ searching: true, order: [] }}
+                options={{ searching: false, order: [] }}
               />
             </Card>
           </>
