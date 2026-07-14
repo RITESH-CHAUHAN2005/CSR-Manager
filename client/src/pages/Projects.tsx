@@ -38,7 +38,7 @@ const STATUS_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
-// On Hold / Cancelled projects must carry a reason (description or notes) for clarity.
+// On Hold / Cancelled projects must carry a reason (a description) for clarity.
 const REASON_REQUIRED: ProjectStatus[] = ['on_hold', 'cancelled']
 
 const emptyForm = {
@@ -52,7 +52,6 @@ const emptyForm = {
   interventionPartner: '',
   startDate: '',
   description: '',
-  notes: '',
 }
 
 export default function Projects() {
@@ -125,8 +124,8 @@ export default function Projects() {
     onError: (err) => setDeleteError(getErrorMessage(err, 'Could not delete project')),
   })
 
-  // Preview of the End Date the server will compute, from the FY the chosen
-  // Start Date falls into (Ongoing -> +3 years; Other than Ongoing -> +1 year).
+  // Preview of the End Date the server will compute, from the FY the chosen Start Date
+  // falls into (Ongoing -> +3 years; Other than Ongoing -> that FY's own end date).
   // Not user-editable.
   const endDatePreview = useMemo(
     () => previewProjectEndDate(years, form.derivedStatus, form.startDate),
@@ -187,8 +186,8 @@ export default function Projects() {
       setFormError('Start date is required.')
       return
     }
-    if (REASON_REQUIRED.includes(form.status) && !form.description.trim() && !form.notes.trim()) {
-      setFormError('Add a description or notes explaining why the project is On Hold or Cancelled.')
+    if (REASON_REQUIRED.includes(form.status) && !form.description.trim()) {
+      setFormError('Add a description explaining why the project is On Hold or Cancelled.')
       return
     }
     // The End Date is always derived server-side.
@@ -290,13 +289,12 @@ export default function Projects() {
                 )}
               </div>
               {p.description && <p className="mt-1 line-clamp-2 text-sm text-primary">{p.description}</p>}
-              {p.notes && <p className="mt-1 line-clamp-2 text-sm text-muted">{p.notes}</p>}
             </div>
             <div className="flex shrink-0 gap-3">
               <button
                 onClick={() => setViewing(p)}
                 className="text-muted hover:text-primary"
-                title="View details, description & notes"
+                title="View full details"
               >
                 <Eye size={16} />
               </button>
@@ -432,7 +430,7 @@ export default function Projects() {
           </div>
           {REASON_REQUIRED.includes(form.status) && (
             <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
-              A description or notes entry is required for {form.status === 'on_hold' ? 'On Hold' : 'Cancelled'} projects.
+              A description is required for {form.status === 'on_hold' ? 'On Hold' : 'Cancelled'} projects.
             </p>
           )}
           <Field label="Attach Document">
@@ -450,9 +448,6 @@ export default function Projects() {
           </Field>
           <Field label="Description">
             <TextArea rows={3} placeholder="Project description…" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </Field>
-          <Field label="Notes">
-            <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
@@ -487,14 +482,7 @@ export default function Projects() {
               ]
             : []
         }
-        sections={
-          viewing
-            ? [
-                { label: 'Description', value: viewing.description },
-                { label: 'Notes', value: viewing.notes },
-              ]
-            : []
-        }
+        sections={viewing ? [{ label: 'Description', value: viewing.description }] : []}
       />
 
       <ConfirmDialog

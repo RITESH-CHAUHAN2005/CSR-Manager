@@ -30,7 +30,7 @@ const empty: Omit<Company, 'id'> = {
   email: '',
   phone: '',
   address: '',
-  notes: '',
+  description: '',
 }
 
 export default function Companies() {
@@ -83,7 +83,7 @@ export default function Companies() {
       email: c.email ?? '',
       phone: c.phone ?? '',
       address: c.address ?? '',
-      notes: c.notes ?? '',
+      description: c.description ?? '',
     })
     setFormError('')
     setFormOpen(true)
@@ -218,12 +218,12 @@ export default function Companies() {
               onChange={(e) => setForm({ ...form, address: e.target.value })}
             />
           </Field>
-          <Field label="Notes">
+          <Field label="Description">
             <TextArea
               rows={2}
-              placeholder="Any additional notes"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Anything worth knowing about this donor"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}

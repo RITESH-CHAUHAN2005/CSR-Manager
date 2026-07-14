@@ -118,7 +118,7 @@ export default function CompanyDetail() {
   // ---- Inline edit ----
   const [editOpen, setEditOpen] = useState(false)
   const [form, setForm] = useState<Omit<Company, 'id'>>({
-    name: '', cin: '', pan: '', contactPerson: '', email: '', phone: '', address: '', notes: '',
+    name: '', cin: '', pan: '', contactPerson: '', email: '', phone: '', address: '', description: '',
   })
   const [formError, setFormError] = useState('')
   const updateM = useMutation({
@@ -138,7 +138,7 @@ export default function CompanyDetail() {
       email: company.email ?? '',
       phone: company.phone ?? '',
       address: company.address ?? '',
-      notes: company.notes ?? '',
+      description: company.description ?? '',
     })
     setFormError('')
     setEditOpen(true)
@@ -218,8 +218,8 @@ export default function CompanyDetail() {
               {!company.contactPerson && !company.email && !company.phone && !company.address && (
                 <p className="text-muted">No contact details on file.</p>
               )}
-              {company.notes && (
-                <p className="mt-2 border-t border-line/60 pt-3 text-muted">{company.notes}</p>
+              {company.description && (
+                <p className="mt-2 border-t border-line/60 pt-3 text-muted">{company.description}</p>
               )}
             </div>
           </div>
@@ -306,7 +306,7 @@ export default function CompanyDetail() {
                   <button
                     onClick={() => setViewProject(row as Project)}
                     className="text-muted hover:text-primary"
-                    title="View details, description & notes"
+                    title="View full details"
                   >
                     <Eye size={16} />
                   </button>
@@ -363,14 +363,7 @@ export default function CompanyDetail() {
               ]
             : []
         }
-        sections={
-          viewProject
-            ? [
-                { label: 'Description', value: viewProject.description },
-                { label: 'Notes', value: viewProject.notes },
-              ]
-            : []
-        }
+        sections={viewProject ? [{ label: 'Description', value: viewProject.description }] : []}
       />
 
       {/* Edit modal */}
@@ -406,8 +399,8 @@ export default function CompanyDetail() {
           <Field label="Address">
             <TextArea rows={2} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           </Field>
-          <Field label="Notes">
-            <TextArea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <Field label="Description">
+            <TextArea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">

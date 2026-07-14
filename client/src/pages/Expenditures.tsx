@@ -11,9 +11,8 @@ import {
   fundReceiptService,
   projectService,
 } from '../services/dataService'
-import type { CapitalAsset, Expenditure, FundingRoute, NatureOfExpense } from '../types'
+import type { Expenditure } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
-import { NATURE_OPTIONS, ROUTE_LABELS, ROUTE_OPTIONS, assetLocation, natureLabel } from '../lib/expenseLabels'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import {
@@ -32,25 +31,12 @@ import {
   TextInput,
 } from '../components/ui'
 
-const emptyAsset: CapitalAsset = {
-  particulars: '',
-  address: '',
-  district: '',
-  state: '',
-  pinCode: '',
-  dateOfCreation: '',
-}
-
 const emptyForm = {
   date: '',
   projectId: '',
   companyId: '',
   financialYearId: '',
   amount: '' as number | string,
-  natureOfExpense: 'project_intervention' as NatureOfExpense,
-  otherNature: '',
-  capitalAsset: { ...emptyAsset },
-  fundingRoute: 'direct' as FundingRoute,
   approvedBy: '',
   description: '',
 }
@@ -96,8 +82,8 @@ export default function Expenditures() {
             projectCode(e.projectId),
             projectName(e.projectId),
             companyName(e.companyId),
-            natureLabel(e),
             e.approvedBy,
+            e.description,
           ].some((f) => (f ?? '').toLowerCase().includes(q))),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,8 +97,6 @@ export default function Expenditures() {
     projectName: projectName(e.projectId),
     companyName: companyName(e.companyId),
     yearName: yearName(e.financialYearId),
-    natureName: natureLabel(e),
-    routeName: ROUTE_LABELS[e.fundingRoute] ?? e.fundingRoute,
   }))
 
   const invalidate = () => {
@@ -157,6 +141,8 @@ export default function Expenditures() {
       const received = sum(
         receipts.filter((r) => r.projectId === selectedProject.id && r.companyId === cid).map((r) => r.amount),
       )
+      // The entry being edited is excluded, so "already spent" means "spent by everything
+      // other than this record" — otherwise editing an amount would double-count it.
       const spent = sum(
         expenditures
           .filter((e) => e.projectId === selectedProject.id && e.companyId === cid && e.id !== editing?.id)
@@ -168,14 +154,12 @@ export default function Expenditures() {
   }, [selectedProject, receipts, expenditures, companies, editing])
 
   const selectedPosition = projectPosition.find((p) => p.companyId === form.companyId)
-  // What this entry leaves behind on an Ongoing project — the carry-forward figure,
-  // computed rather than typed. Nobody keys a carry-forward amount in any more.
+  // Carry forward is computed, never entered — what this entry leaves unspent on an
+  // Ongoing project.
   const carryForwardAfter = selectedPosition
-    ? Math.max(0, selectedPosition.remaining - (Number(form.amount) || 0))
+    ? selectedPosition.remaining - (Number(form.amount) || 0)
     : 0
-  const overspend = selectedPosition
-    ? (Number(form.amount) || 0) - selectedPosition.remaining
-    : 0
+  const showCarryForward = selectedProject?.derivedStatus === 'ongoing' && !!selectedPosition
 
   function pickProject(projectId: string) {
     const proj = projects.find((p) => p.id === projectId)
@@ -184,13 +168,7 @@ export default function Expenditures() {
       ...f,
       projectId,
       companyId: ids.length === 1 ? ids[0] : ids.includes(f.companyId) ? f.companyId : '',
-      // A spend can only be routed through a partner the project actually names.
-      fundingRoute: proj?.interventionPartner ? f.fundingRoute : 'direct',
     }))
-  }
-
-  function setAsset(patch: Partial<CapitalAsset>) {
-    setForm((f) => ({ ...f, capitalAsset: { ...f.capitalAsset, ...patch } }))
   }
 
   function openAdd() {
@@ -199,7 +177,6 @@ export default function Expenditures() {
     const ids = first?.companyIds ?? []
     setForm({
       ...emptyForm,
-      capitalAsset: { ...emptyAsset },
       projectId: first?.id ?? '',
       companyId: ids.length === 1 ? ids[0] : '',
       financialYearId: activeYears[0]?.id ?? '',
@@ -210,11 +187,7 @@ export default function Expenditures() {
   }
   function openEdit(e: Expenditure) {
     setEditing(e)
-    setForm({
-      ...emptyForm,
-      ...e,
-      capitalAsset: { ...emptyAsset, ...(e.capitalAsset ?? {}) },
-    })
+    setForm({ ...emptyForm, ...e })
     setPendingFiles([])
     setFormError('')
     setOpen(true)
@@ -223,15 +196,7 @@ export default function Expenditures() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
-    const isCapital = form.natureOfExpense === 'capital_asset'
-    const payload = {
-      ...form,
-      amount: Number(form.amount),
-      otherNature: form.natureOfExpense === 'other' ? form.otherNature.trim() : '',
-      // Asset details only travel with a Capital Asset — otherwise they'd linger as
-      // stale text on an entry that has no asset.
-      capitalAsset: isCapital ? form.capitalAsset : { ...emptyAsset },
-    }
+    const payload = { ...form, amount: Number(form.amount) }
     try {
       if (editing) {
         await updateM.mutateAsync({ id: editing.id, data: payload })
@@ -290,15 +255,14 @@ export default function Expenditures() {
             { data: 'projectName', title: 'Project' },
             { data: 'companyName', title: 'Company' },
             { data: 'yearName', title: 'Year' },
-            { data: 'natureName', title: 'Nature of Expense' },
-            { data: 'routeName', title: 'Direct / Partner' },
+            { data: 'approvedBy', title: 'Approved By' },
             { data: 'amount', title: 'Amount Spent', className: 'text-right' },
             { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
           ]}
           slots={{
             0: (_v, row) => <span className="font-mono text-xs text-muted">{row.projectCode}</span>,
-            7: (_v, row) => <span className="font-semibold text-danger">{formatINR((row as Expenditure).amount)}</span>,
-            8: (_v, row) => (
+            6: (_v, row) => <span className="font-semibold text-danger">{formatINR((row as Expenditure).amount)}</span>,
+            7: (_v, row) => (
               <div className="flex justify-end gap-3">
                 <button onClick={() => setViewing(row as Expenditure)} className="text-muted hover:text-primary" title="View full details"><Eye size={16} /></button>
                 {canWrite && (
@@ -382,144 +346,44 @@ export default function Expenditures() {
               <TextInput type="number" min={0} required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
             </Field>
             <Field label="Date of Spend">
-              <DatePicker required value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
+              {/* Money can't be spent in the future — the server enforces this too. */}
+              <DatePicker required maxDate="today" value={form.date} onChange={(iso) => setForm({ ...form, date: iso })} />
             </Field>
-            <Field label="Nature of Expense">
-              <FormSelect
-                value={form.natureOfExpense}
-                onChange={(e) => setForm({ ...form, natureOfExpense: e.target.value as NatureOfExpense })}
-              >
-                {NATURE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </FormSelect>
-            </Field>
-            <Field label="Whether Direct or through Intervention Partner">
-              <FormSelect
-                value={form.fundingRoute}
-                onChange={(e) => setForm({ ...form, fundingRoute: e.target.value as FundingRoute })}
-              >
-                {ROUTE_OPTIONS.map(([value, label]) => (
-                  // A project with no Intervention Partner named on it has nobody to route through.
-                  <option
-                    key={value}
-                    value={value}
-                    disabled={value === 'intervention_partner' && !selectedProject?.interventionPartner}
-                  >
-                    {label}
-                  </option>
-                ))}
-              </FormSelect>
-            </Field>
-          </div>
-
-          {form.fundingRoute === 'intervention_partner' && selectedProject?.interventionPartner && (
-            <p className="rounded-xl bg-ink/[0.03] px-3 py-2 text-xs text-muted">
-              Routed through <span className="font-medium text-ink/80">{selectedProject.interventionPartner}</span>, the
-              Intervention Partner named on this project.
-            </p>
-          )}
-          {!selectedProject?.interventionPartner && (
-            <p className="text-xs text-muted">
-              This project has no Intervention Partner. Add one on the project to record a spend routed through a partner.
-            </p>
-          )}
-
-          {form.natureOfExpense === 'other' && (
-            <Field label="Specify the nature of the expense">
-              <TextInput
-                required
-                placeholder="e.g. Furniture and fixtures"
-                value={form.otherNature}
-                onChange={(e) => setForm({ ...form, otherNature: e.target.value })}
-              />
-            </Field>
-          )}
-
-          {form.natureOfExpense === 'capital_asset' && (
-            <div className="space-y-4 rounded-xl border border-line bg-surface/60 p-4">
-              <p className="text-sm font-medium text-ink">Capital Asset</p>
-              <Field label="Short particulars of the property or asset(s)">
+            {showCarryForward && (
+              <Field label="Carry Forward (auto)">
                 <TextInput
-                  required
-                  placeholder="e.g. 25 desktop computers and networking equipment"
-                  value={form.capitalAsset.particulars}
-                  onChange={(e) => setAsset({ particulars: e.target.value })}
+                  value={formatINR(Math.max(0, carryForwardAfter))}
+                  readOnly
+                  disabled
+                  title="What remains unspent of this company's funds on this Ongoing project after this entry. Computed, not entered."
                 />
               </Field>
-              <Field label="Complete address">
-                <TextArea
-                  required
-                  rows={2}
-                  placeholder="Where the asset physically sits"
-                  value={form.capitalAsset.address}
-                  onChange={(e) => setAsset({ address: e.target.value })}
-                />
-              </Field>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="District">
-                  <TextInput required value={form.capitalAsset.district} onChange={(e) => setAsset({ district: e.target.value })} />
-                </Field>
-                <Field label="State">
-                  <TextInput required value={form.capitalAsset.state} onChange={(e) => setAsset({ state: e.target.value })} />
-                </Field>
-                <Field label="PIN Code">
-                  <TextInput
-                    required
-                    inputMode="numeric"
-                    pattern="\d{6}"
-                    maxLength={6}
-                    placeholder="6 digits"
-                    value={form.capitalAsset.pinCode}
-                    onChange={(e) => setAsset({ pinCode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                  />
-                </Field>
-                <Field label="Date of creation">
-                  <DatePicker
-                    required
-                    value={form.capitalAsset.dateOfCreation}
-                    onChange={(iso) => setAsset({ dateOfCreation: iso })}
-                  />
-                </Field>
-              </div>
-            </div>
-          )}
-
-          {/* Carry forward is derived, never entered — this is what the entry leaves behind. */}
-          {selectedProject?.derivedStatus === 'ongoing' && selectedPosition && (
-            <div className="rounded-xl bg-ink/[0.03] px-4 py-3 text-sm">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">Carry Forward (auto)</p>
-              {overspend > 0 ? (
-                <p className="mt-1 text-danger">
-                  This spend exceeds what {companyName(form.companyId)} has left on this project by{' '}
-                  <span className="font-semibold">{formatINR(overspend)}</span>. Nothing would carry forward.
-                </p>
-              ) : (
-                <p className="mt-1 text-ink/80">
-                  After this entry, <span className="font-medium">{formatINR(carryForwardAfter)}</span> of{' '}
-                  {companyName(form.companyId)}'s funds remain unspent on this Ongoing project and carry into the next
-                  financial year.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            )}
             <Field label="Approved By">
               <TextInput placeholder="Name or designation" value={form.approvedBy} onChange={(e) => setForm({ ...form, approvedBy: e.target.value })} />
             </Field>
-            <Field label="Attach Document">
-              {editing ? (
-                <DocumentAttachments
-                  parentId={editing.id}
-                  canWrite={canWrite}
-                  allowUpload
-                  service={expenditureDocumentService}
-                  queryKey="expenditure-documents"
-                />
-              ) : (
-                <StagedAttachments files={pendingFiles} setFiles={setPendingFiles} />
-              )}
-            </Field>
           </div>
+
+          {showCarryForward && carryForwardAfter < 0 && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+              This spend exceeds what {companyName(form.companyId)} has left on this project by{' '}
+              <span className="font-semibold">{formatINR(-carryForwardAfter)}</span> — nothing would carry forward.
+            </p>
+          )}
+
+          <Field label="Attach Documents">
+            {editing ? (
+              <DocumentAttachments
+                parentId={editing.id}
+                canWrite={canWrite}
+                allowUpload
+                service={expenditureDocumentService}
+                queryKey="expenditure-documents"
+              />
+            ) : (
+              <StagedAttachments files={pendingFiles} setFiles={setPendingFiles} />
+            )}
+          </Field>
           <Field label="Description">
             <TextArea rows={3} placeholder="What was this expenditure for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
@@ -535,6 +399,19 @@ export default function Expenditures() {
         open={!!viewing}
         onClose={() => setViewing(null)}
         title={viewing ? `Expenditure — ${projectCode(viewing.projectId)}` : 'Expenditure'}
+        extra={
+          viewing && (
+            <div className="mt-5">
+              <DocumentAttachments
+                parentId={viewing.id}
+                canWrite={false}
+                allowUpload={false}
+                service={expenditureDocumentService}
+                queryKey="expenditure-documents"
+              />
+            </div>
+          )
+        }
         rows={
           viewing
             ? [
@@ -542,22 +419,8 @@ export default function Expenditures() {
                 { label: 'Project', value: projectName(viewing.projectId) },
                 { label: 'Name of the Company', value: companyName(viewing.companyId) },
                 { label: 'Financial Year', value: yearName(viewing.financialYearId) },
-                { label: 'Nature of Expense', value: natureLabel(viewing) },
-                { label: 'Direct / Through Partner', value: ROUTE_LABELS[viewing.fundingRoute] ?? viewing.fundingRoute },
                 { label: 'Amount Spent', value: <span className="font-semibold text-danger">{formatINR(viewing.amount)}</span> },
                 { label: 'Date of Spend', value: viewing.date ? formatDate(viewing.date) : '' },
-                ...(viewing.natureOfExpense === 'capital_asset'
-                  ? [
-                      { label: 'Asset Particulars', value: viewing.capitalAsset?.particulars },
-                      { label: 'Asset Location', value: assetLocation(viewing) },
-                      {
-                        label: 'Asset Created On',
-                        value: viewing.capitalAsset?.dateOfCreation
-                          ? formatDate(viewing.capitalAsset.dateOfCreation)
-                          : '',
-                      },
-                    ]
-                  : []),
                 { label: 'Approved By', value: viewing.approvedBy },
                 { label: 'Recorded By', value: viewing.createdByName || viewing.createdByEmail },
               ]

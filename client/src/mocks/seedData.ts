@@ -22,7 +22,7 @@ export const companies: Company[] = [
     email: 'csrtrust@hdfc.com',
     phone: '+91-22-66521000',
     address: 'HDFC Bank House, Senapati Bapat Marg, Lower Parel, Mumbai - 400013',
-    notes: 'Long-standing CSR partner; focus on environment and elderly-care programmes.',
+    description: 'Long-standing CSR partner; focus on environment and elderly-care programmes.',
   },
   {
     id: 'c2',
@@ -33,7 +33,7 @@ export const companies: Company[] = [
     email: 'foundation@infosys.com',
     phone: '+91-80-28520261',
     address: 'Infosys Foundation, Electronics City, Hosur Road, Bengaluru - 560100',
-    notes: 'Supports education scholarships and rural healthcare initiatives.',
+    description: 'Supports education scholarships and rural healthcare initiatives.',
   },
   {
     id: 'c3',
@@ -44,7 +44,7 @@ export const companies: Company[] = [
     email: 'csr@tcs.com',
     phone: '+91-22-67789999',
     address: 'TCS House, Raveline Street, Fort, Mumbai - 400001',
-    notes: 'Primary donor for digital-literacy and skill-development programmes.',
+    description: 'Primary donor for digital-literacy and skill-development programmes.',
   },
 ]
 
@@ -177,22 +177,22 @@ export const fundReceipts: FundReceipt[] = [
 
 export const expenditures: Expenditure[] = [
   // FY 2022-23 — total ₹22,50,000 (Digital Literacy Program, TCS)
-  { id: 'e1', date: '2022-06-20', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', natureOfExpense: 'project_intervention', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 800000, description: 'Setting up village learning centres' },
-  { id: 'e2', date: '2022-09-15', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', natureOfExpense: 'project_intervention', fundingRoute: 'direct', approvedBy: 'Executive Director', amount: 950000, description: 'Trainer fees and course material' },
-  { id: 'e3', date: '2023-01-20', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', natureOfExpense: 'capital_asset', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 500000, description: 'Computer lab for the Pune centre', capitalAsset: { particulars: '25 desktop computers and networking equipment', address: 'Zilla Parishad School, Hadapsar', district: 'Pune', state: 'Maharashtra', pinCode: '411028', dateOfCreation: '2023-01-20' } },
+  { id: 'e1', date: '2022-06-20', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', approvedBy: 'Trustee Board', amount: 800000, description: 'Setting up village learning centres' },
+  { id: 'e2', date: '2022-09-15', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', approvedBy: 'Executive Director', amount: 950000, description: 'Trainer fees and course material' },
+  { id: 'e3', date: '2023-01-20', projectId: 'p1', companyId: 'c3', financialYearId: 'fy1', approvedBy: 'Trustee Board', amount: 500000, description: 'Computer lab for the Pune centre' },
   // FY 2023-24 — total ₹55,70,000
-  { id: 'e4', date: '2023-07-20', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', natureOfExpense: 'capital_asset', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 1200000, description: 'Water purification units', capitalAsset: { particulars: '10 reverse-osmosis water purification units', address: 'Kalmeshwar Block, Village Cluster 4', district: 'Nagpur', state: 'Maharashtra', pinCode: '441501', dateOfCreation: '2023-07-20' } },
-  { id: 'e5', date: '2023-08-15', projectId: 'p4', companyId: 'c2', financialYearId: 'fy2', natureOfExpense: 'project_intervention', fundingRoute: 'intervention_partner', approvedBy: 'Trustee Board', amount: 1600000, description: 'Scholarship disbursal to 320 students' },
-  { id: 'e6', date: '2023-09-01', projectId: 'p6', companyId: 'c1', financialYearId: 'fy2', natureOfExpense: 'project_intervention', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 750000, description: 'Saplings, plantation labour and 1-year upkeep' },
-  { id: 'e7', date: '2023-11-10', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', natureOfExpense: 'project_intervention', fundingRoute: 'direct', approvedBy: 'Executive Director', amount: 1800000, description: 'Pipeline laying and village distribution points' },
-  { id: 'e8', date: '2024-01-15', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', natureOfExpense: 'administrative_overheads', fundingRoute: 'direct', approvedBy: 'Executive Director', amount: 220000, description: 'Programme administration for the year' },
+  { id: 'e4', date: '2023-07-20', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', approvedBy: 'Trustee Board', amount: 1200000, description: 'Water purification units' },
+  { id: 'e5', date: '2023-08-15', projectId: 'p4', companyId: 'c2', financialYearId: 'fy2', approvedBy: 'Trustee Board', amount: 1600000, description: 'Scholarship disbursal to 320 students' },
+  { id: 'e6', date: '2023-09-01', projectId: 'p6', companyId: 'c1', financialYearId: 'fy2', approvedBy: 'Trustee Board', amount: 750000, description: 'Saplings, plantation labour and 1-year upkeep' },
+  { id: 'e7', date: '2023-11-10', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', approvedBy: 'Executive Director', amount: 1800000, description: 'Pipeline laying and village distribution points' },
+  { id: 'e8', date: '2024-01-15', projectId: 'p2', companyId: 'c3', financialYearId: 'fy2', approvedBy: 'Executive Director', amount: 220000, description: 'Programme administration for the year' },
   // FY 2024-25 — total ₹44,80,000
-  { id: 'e9', date: '2024-05-30', projectId: 'p3', companyId: 'c3', financialYearId: 'fy3', natureOfExpense: 'project_intervention', fundingRoute: 'intervention_partner', approvedBy: 'Trustee Board', amount: 900000, description: 'Tailoring and food-processing skill batches' },
-  { id: 'e10', date: '2024-07-12', projectId: 'p3', companyId: 'c3', financialYearId: 'fy3', natureOfExpense: 'impact_assessment', fundingRoute: 'direct', approvedBy: 'Executive Director', amount: 650000, description: 'Independent impact assessment of batch 1' },
-  { id: 'e11', date: '2024-08-22', projectId: 'p5', companyId: 'c2', financialYearId: 'fy3', natureOfExpense: 'capital_asset', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 730000, description: 'Mobile health unit', capitalAsset: { particulars: 'Mobile medical van with diagnostic equipment', address: 'Primary Health Centre, T. Narasipura Road', district: 'Mysuru', state: 'Karnataka', pinCode: '571124', dateOfCreation: '2024-08-22' } },
-  { id: 'e12', date: '2024-09-18', projectId: 'p5', companyId: 'c2', financialYearId: 'fy3', natureOfExpense: 'project_intervention', fundingRoute: 'intervention_partner', approvedBy: 'Executive Director', amount: 500000, description: 'Medicines and camp staffing' },
-  { id: 'e13', date: '2024-10-05', projectId: 'p7', companyId: 'c1', financialYearId: 'fy3', natureOfExpense: 'capital_asset', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 1000000, description: 'Day-care wing construction', capitalAsset: { particulars: 'Day-care wing — 12-bed senior citizen facility', address: 'Plot 14, Sector 3, Charkop, Kandivali West', district: 'Mumbai Suburban', state: 'Maharashtra', pinCode: '400067', dateOfCreation: '2024-10-05' } },
-  { id: 'e14', date: '2024-11-28', projectId: 'p7', companyId: 'c1', financialYearId: 'fy3', natureOfExpense: 'other', otherNature: 'Furniture and fixtures', fundingRoute: 'direct', approvedBy: 'Trustee Board', amount: 700000, description: 'Beds, seating and kitchen fit-out' },
+  { id: 'e9', date: '2024-05-30', projectId: 'p3', companyId: 'c3', financialYearId: 'fy3', approvedBy: 'Trustee Board', amount: 900000, description: 'Tailoring and food-processing skill batches' },
+  { id: 'e10', date: '2024-07-12', projectId: 'p3', companyId: 'c3', financialYearId: 'fy3', approvedBy: 'Executive Director', amount: 650000, description: 'Independent impact assessment of batch 1' },
+  { id: 'e11', date: '2024-08-22', projectId: 'p5', companyId: 'c2', financialYearId: 'fy3', approvedBy: 'Trustee Board', amount: 730000, description: 'Mobile health unit' },
+  { id: 'e12', date: '2024-09-18', projectId: 'p5', companyId: 'c2', financialYearId: 'fy3', approvedBy: 'Executive Director', amount: 500000, description: 'Medicines and camp staffing' },
+  { id: 'e13', date: '2024-10-05', projectId: 'p7', companyId: 'c1', financialYearId: 'fy3', approvedBy: 'Trustee Board', amount: 1000000, description: 'Day-care wing construction' },
+  { id: 'e14', date: '2024-11-28', projectId: 'p7', companyId: 'c1', financialYearId: 'fy3', approvedBy: 'Trustee Board', amount: 700000, description: 'Beds, seating and kitchen fit-out' },
 ]
 
 // Demo credentials for the login screen (mock mode). The live API uses real JWT auth

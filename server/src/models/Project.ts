@@ -36,7 +36,6 @@ export interface IProject extends Document {
   // derived alongside endDate in computeProjectDates middleware. Kept so the FY is
   // queryable/reportable without re-deriving from dates on every read.
   financialYearId?: Types.ObjectId
-  notes?: string
 }
 
 const projectSchema = new Schema<IProject>(
@@ -65,7 +64,6 @@ const projectSchema = new Schema<IProject>(
     startDate: { type: String, default: '' },
     endDate: { type: String, default: '' },
     financialYearId: { type: Schema.Types.ObjectId, ref: 'FinancialYear', index: true },
-    notes: { type: String, default: '', trim: true },
     ...createdByFields,
   },
   { timestamps: true, toJSON: baseToJSON },

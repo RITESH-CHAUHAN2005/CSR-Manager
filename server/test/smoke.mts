@@ -242,7 +242,7 @@ async function run() {
   check('carry forward derived = 24,50,000', before?.carryForward === 2450000, `got ${before?.carryForward}`)
   check('carry-forward row names its project code', before?.projectCode === 'WOME2024', `got ${before?.projectCode}`)
 
-  // 18. A Capital Asset expenditure must carry the asset's location details.
+  // 18. Money cannot be spent in the future.
   r = await fetch(`${BASE}/projects`, { headers: { cookie: adminCookie } })
   const allProjects = await r.json()
   const ongoing = allProjects.find((p: { projectCode: string }) => p.projectCode === 'WOME2024')
@@ -250,31 +250,50 @@ async function run() {
   const fys = await r.json()
   const activeFy = fys.find((y: { isActive: boolean }) => y.isActive)
 
-  const capitalSpend = (capitalAsset: Record<string, string>) =>
+  const spend = (date: string, amount: number) =>
     JSON.stringify({
-      date: '2024-12-01', projectId: ongoing.id, companyId: ongoing.companyIds[0],
-      financialYearId: activeFy.id, natureOfExpense: 'capital_asset',
-      fundingRoute: 'direct', amount: 50000, capitalAsset,
+      date, projectId: ongoing.id, companyId: ongoing.companyIds[0],
+      financialYearId: activeFy.id, amount, description: 'date rule test',
     })
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
   r = await fetch(`${BASE}/expenditures`, {
     method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
-    body: capitalSpend({ particulars: 'A shed' }),
+    body: spend(tomorrow, 1000),
   })
-  check('capital asset without location -> 422', r.status === 422, `got ${r.status}`)
+  check('future date of spend -> 422', r.status === 422, `got ${r.status}`)
 
   r = await fetch(`${BASE}/expenditures`, {
     method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
-    body: capitalSpend({
-      particulars: 'A shed', address: '1 Test Road', district: 'Pune',
-      state: 'Maharashtra', pinCode: '411001', dateOfCreation: '2024-12-01',
-    }),
+    body: spend(new Date().toISOString().slice(0, 10), 50000),
   })
-  check('complete capital asset -> 201', r.status === 201, `got ${r.status}`)
+  const spent = await r.json()
+  check("today's date of spend -> 201", r.status === 201, `got ${r.status}`)
+  // The retired fields must not come back on a round-trip.
+  check(
+    'expenditure carries no category/notes/nature',
+    !('category' in spent) && !('notes' in spent) && !('natureOfExpense' in spent),
+    JSON.stringify(Object.keys(spent)),
+  )
 
-  // 19. …and that fresh ₹50,000 spend immediately eats into the carry forward, with no
-  //     one having typed a carry-forward figure anywhere.
+  // 19. That fresh 50,000 spend immediately eats into the carry forward, with no one
+  //     having typed a carry-forward figure anywhere.
   const after = await womenCf()
   check('spending drops carry forward to 24,00,000', after?.carryForward === 2400000, `got ${after?.carryForward}`)
+
+  // 20. There is no cap on how many documents a record can carry — the old limit was 5.
+  const form = (name: string) => {
+    const fd = new FormData()
+    fd.append('file', new Blob(['x'], { type: 'text/plain' }), name)
+    return fd
+  }
+  let uploaded = 0
+  for (let i = 1; i <= 7; i++) {
+    r = await fetch(`${BASE}/expenditures/${spent.id}/documents`, {
+      method: 'POST', headers: { cookie: adminCookie }, body: form(`doc${i}.txt`),
+    })
+    if (r.status === 201) uploaded++
+  }
+  check('7 documents on one expenditure (no cap)', uploaded === 7, `only ${uploaded} accepted`)
 }
 
 try {

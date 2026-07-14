@@ -6,9 +6,9 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ExpenditureDocument } from '../models/ExpenditureDocument.js'
 
-// Mirrors projectDocumentRoutes.ts — same 5 files/8MB caps, same shape.
-const MAX_DOCS_PER_EXPENDITURE = 5
-const MAX_FILE_SIZE = 8 * 1024 * 1024
+// Mirrors projectDocumentRoutes.ts — no cap on the number of files; the 15MB per-file
+// cap is MongoDB's 16MB document limit, not a policy.
+const MAX_FILE_SIZE = 15 * 1024 * 1024
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } })
 
@@ -41,10 +41,6 @@ router.post(
   uploadSingle,
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded')
-    const count = await ExpenditureDocument.countDocuments({ expenditureId: req.params.expenditureId })
-    if (count >= MAX_DOCS_PER_EXPENDITURE) {
-      throw new ApiError(409, `Maximum ${MAX_DOCS_PER_EXPENDITURE} documents per expenditure`)
-    }
     const doc = await ExpenditureDocument.create({
       expenditureId: req.params.expenditureId,
       filename: req.file.originalname,

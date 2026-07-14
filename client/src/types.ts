@@ -70,7 +70,7 @@ export interface Company {
   email: string
   phone: string
   address?: string // registered address
-  notes?: string // free-form notes
+  description?: string // free-form notes about the donor
 }
 
 export interface FinancialYear {
@@ -107,7 +107,6 @@ export interface Project extends CreatedBy {
   startDate?: string
   endDate?: string // computed server-side, not user-editable
   financialYearId?: string // the FY the start date falls into; derived server-side
-  notes?: string
 }
 
 export type PaymentMode = 'NEFT' | 'RTGS' | 'Cheque' | ''
@@ -129,7 +128,7 @@ export interface FundReceipt extends CreatedBy {
   mode?: PaymentMode // no longer collected on the form; kept for historical records
   carryForward?: number // no longer collected on the form; kept for historical records
   amount: number
-  notes?: string
+  description?: string
 }
 
 // ---- Master Data (Category / Status / Source) ----
@@ -183,38 +182,12 @@ export interface ExpenditureDocumentMeta {
   createdAt?: string
 }
 
-// The statutory CSR expenditure heads.
-export type NatureOfExpense =
-  | 'project_intervention'
-  | 'administrative_overheads'
-  | 'impact_assessment'
-  | 'capital_asset'
-  | 'other'
-
-// Was the money spent by the company itself, or routed through the project's
-// implementing agency (the Intervention Partner named on the Project)?
-export type FundingRoute = 'direct' | 'intervention_partner'
-
-// Only captured when natureOfExpense is 'capital_asset'.
-export interface CapitalAsset {
-  particulars: string
-  address: string
-  district: string
-  state: string
-  pinCode: string
-  dateOfCreation: string
-}
-
 export interface Expenditure extends CreatedBy {
   id: string
-  date: string // date of spend, ISO yyyy-mm-dd
+  date: string // date of spend, ISO yyyy-mm-dd — never in the future
   projectId: string
   companyId: string
   financialYearId: string
-  natureOfExpense: NatureOfExpense
-  otherNature?: string // required when natureOfExpense is 'other'
-  capitalAsset?: CapitalAsset
-  fundingRoute: FundingRoute
   approvedBy: string // Trustee Board, Executive Director...
   amount: number
   description?: string

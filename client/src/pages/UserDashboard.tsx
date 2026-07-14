@@ -9,8 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { Card, PageHeader } from '../components/ui'
 import { DataTable, type DTColumn } from '../components/DataTable'
-import { formatINR } from '../lib/currency'
-import { natureLabel } from '../lib/expenseLabels'
+import { formatDate, formatINR } from '../lib/currency'
 import { describeLog, formatTimestamp } from '../lib/activity'
 
 export default function UserDashboard() {
@@ -70,7 +69,7 @@ export default function UserDashboard() {
               <Row key={r.id} type="Receipt" label={r.reference} value={formatINR(r.amount)} />
             ))}
             {myExpenditures.map((e) => (
-              <Row key={e.id} type="Expenditure" label={natureLabel(e)} value={formatINR(e.amount)} />
+              <Row key={e.id} type="Expenditure" label={e.description || formatDate(e.date)} value={formatINR(e.amount)} />
             ))}
           </div>
         )}

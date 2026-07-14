@@ -40,7 +40,7 @@ const emptyForm = {
   projectId: '',
   amount: '' as number | string,
   reference: '',
-  notes: '',
+  description: '',
   // Per-contributing-company amount and account number, keyed by company id — used
   // when a project is chosen and all of its companies are entered together in one go.
   // Every company banks from its own account, so the account number belongs on the
@@ -276,7 +276,7 @@ export default function FundReceipts() {
             6: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
             7: (_v, row) => (
               <div className="flex justify-end gap-3">
-                <button onClick={() => setViewing(row as FundReceipt)} className="text-muted hover:text-primary" title="View details & notes"><Eye size={16} /></button>
+                <button onClick={() => setViewing(row as FundReceipt)} className="text-muted hover:text-primary" title="View full details"><Eye size={16} /></button>
                 {canWrite && (
                   <>
                     <button onClick={() => openEdit(row as FundReceipt)} className="text-muted hover:text-primary" title="Edit"><Pencil size={16} /></button>
@@ -416,8 +416,8 @@ export default function FundReceipts() {
               <StagedAttachments files={pendingFiles} setFiles={setPendingFiles} />
             )}
           </Field>
-          <Field label="Notes">
-            <TextArea rows={2} placeholder="Additional notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <Field label="Description">
+            <TextArea rows={2} placeholder="Anything worth noting about this receipt" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">
@@ -464,7 +464,7 @@ export default function FundReceipts() {
               ]
             : []
         }
-        sections={viewing ? [{ label: 'Notes', value: viewing.notes }] : []}
+        sections={viewing ? [{ label: 'Description', value: viewing.description }] : []}
       />
 
       <ConfirmDialog

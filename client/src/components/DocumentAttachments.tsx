@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { File, FileCsv, FileDoc, FileImage, FilePdf, Upload, X } from './icons'
 import { getErrorMessage } from '../lib/errors'
 
-export const MAX_DOCS_PER_PARENT = 5
-export const MAX_FILE_SIZE = 8 * 1024 * 1024
+// There is no limit on how many files a record can carry. The per-file size cap is not a
+// policy choice: a file's bytes are stored inside its MongoDB document, and MongoDB
+// rejects any document over 16MB — 15MB leaves room for the metadata.
+export const MAX_FILE_SIZE = 15 * 1024 * 1024
+const sizeLabel = `${MAX_FILE_SIZE / (1024 * 1024)}MB`
 
 interface AttachmentMeta {
   id: string
@@ -28,11 +31,10 @@ export function DocIcon({ mimeType }: { mimeType: string }) {
   return <File size={22} />
 }
 
-// Small row of document cards — up to 5 files of any type against a given parent
-// record (a Project or an Expenditure). Editor/admin can upload (when
-// allowUpload — only inside the Add/Edit modal, not the list row) and delete;
-// everyone can open/download. Generic over `service` so both Projects and
-// Expenditures can share this component.
+// Row of document cards — as many files of any type as the user wants against a given
+// parent record (a Project, a Receipt or an Expenditure). Editor/admin can upload (when
+// allowUpload — only inside the Add/Edit modal, not the list row) and delete; everyone
+// can open/download. Generic over `service` so every parent type shares this component.
 export function DocumentAttachments({
   parentId,
   canWrite,
@@ -52,9 +54,20 @@ export function DocumentAttachments({
   const { data: docs = [] } = useQuery({ queryKey: key, queryFn: () => service.list(parentId) })
   const [uploadError, setUploadError] = useState('')
 
+  // Uploads run one request per file, so picking several at once still works against the
+  // single-file endpoint. Failures are reported without losing the ones that succeeded.
   const uploadM = useMutation({
-    mutationFn: (file: File) => service.upload(parentId, file),
-    onSuccess: () => qc.invalidateQueries({ queryKey: key }),
+    mutationFn: async (files: File[]) => {
+      const results = await Promise.allSettled(files.map((f) => service.upload(parentId, f)))
+      const failed = results.filter((r) => r.status === 'rejected')
+      if (failed.length > 0) {
+        throw new Error(
+          getErrorMessage((failed[0] as PromiseRejectedResult).reason, 'Upload failed') +
+            (failed.length > 1 ? ` (${failed.length} of ${files.length} files failed)` : ''),
+        )
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
     onError: (err) => setUploadError(getErrorMessage(err, 'Upload failed')),
   })
   const deleteM = useMutation({
@@ -63,11 +76,16 @@ export function DocumentAttachments({
   })
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const files = [...(e.target.files ?? [])]
     e.target.value = ''
-    if (!file) return
+    if (files.length === 0) return
+    const tooBig = files.filter((f) => f.size > MAX_FILE_SIZE)
+    if (tooBig.length > 0) {
+      setUploadError(`${tooBig.map((f) => f.name).join(', ')} — each file must be under ${sizeLabel}`)
+      return
+    }
     setUploadError('')
-    uploadM.mutate(file)
+    uploadM.mutate(files)
   }
 
   if (docs.length === 0 && !(canWrite && allowUpload)) return null
@@ -108,14 +126,14 @@ export function DocumentAttachments({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={docs.length >= MAX_DOCS_PER_PARENT || uploadM.isPending}
-            title={docs.length >= MAX_DOCS_PER_PARENT ? `Maximum ${MAX_DOCS_PER_PARENT} documents` : 'Upload a document'}
+            disabled={uploadM.isPending}
+            title={`Upload documents (any number, up to ${sizeLabel} each)`}
             className="flex w-20 flex-col items-center gap-1 rounded-xl border border-dashed border-line p-2 text-muted hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Upload size={20} />
             <span className="text-[10px]">{uploadM.isPending ? 'Uploading…' : 'Upload'}</span>
           </button>
-          <input ref={fileInputRef} type="file" className="hidden" onChange={onPick} />
+          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onPick} />
         </>
       )}
       {uploadError && <p className="w-full text-xs text-danger">{uploadError}</p>}
@@ -130,19 +148,16 @@ export function StagedAttachments({ files, setFiles }: { files: File[]; setFiles
   const [error, setError] = useState('')
 
   function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const picked = [...(e.target.files ?? [])]
     e.target.value = ''
-    if (!file) return
-    if (files.length >= MAX_DOCS_PER_PARENT) {
-      setError(`Maximum ${MAX_DOCS_PER_PARENT} documents`)
-      return
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File exceeds the ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`)
+    if (picked.length === 0) return
+    const tooBig = picked.filter((f) => f.size > MAX_FILE_SIZE)
+    if (tooBig.length > 0) {
+      setError(`${tooBig.map((f) => f.name).join(', ')} — each file must be under ${sizeLabel}`)
       return
     }
     setError('')
-    setFiles([...files, file])
+    setFiles([...files, ...picked])
   }
   function remove(index: number) {
     setFiles(files.filter((_, i) => i !== index))
@@ -173,14 +188,13 @@ export function StagedAttachments({ files, setFiles }: { files: File[]; setFiles
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
-        disabled={files.length >= MAX_DOCS_PER_PARENT}
-        title={files.length >= MAX_DOCS_PER_PARENT ? `Maximum ${MAX_DOCS_PER_PARENT} documents` : 'Add a document'}
-        className="flex w-20 flex-col items-center gap-1 rounded-xl border border-dashed border-line p-2 text-muted hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
+        title={`Add documents (any number, up to ${sizeLabel} each)`}
+        className="flex w-20 flex-col items-center gap-1 rounded-xl border border-dashed border-line p-2 text-muted hover:bg-ink/5"
       >
         <Upload size={20} />
         <span className="text-[10px]">Add</span>
       </button>
-      <input ref={fileInputRef} type="file" className="hidden" onChange={onPick} />
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={onPick} />
       {error && <p className="w-full text-xs text-danger">{error}</p>}
       <p className="w-full text-xs text-muted">Uploaded once the record is created.</p>
     </div>

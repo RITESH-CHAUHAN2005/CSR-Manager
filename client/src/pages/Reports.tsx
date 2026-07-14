@@ -24,7 +24,6 @@ import { USE_API } from "../services/api";
 import { formatDate, formatINR, formatLakhAxis } from "../lib/currency";
 import { findCurrentFinancialYear } from "../lib/financialYear";
 import { carryForwardByCompany, carryForwardRows, rollsIntoYear, yearFundFlow } from "../lib/carryForward";
-import { natureLabel } from "../lib/expenseLabels";
 import { receivedTotal } from "../lib/projectContributions";
 import { CHART_COLORS, colorFor } from "../lib/chartColors";
 import { Card, PageHeader, Select, StatusBadge } from "../components/ui";
@@ -297,7 +296,6 @@ export default function Reports() {
       company: string;
       project: string;
       fy: string;
-      detail: string;
       baseAmount: number;
     };
     const project = (id?: string) => (id ? projects.find((p) => p.id === id) : undefined);
@@ -313,7 +311,6 @@ export default function Reports() {
           : companies.find((c) => c.id === r.companyId)?.name ?? "—",
       project: project(r.projectId)?.name ?? "—",
       fy: years.find((y) => y.id === r.financialYearId)?.name ?? "—",
-      detail: "—",
       baseAmount: r.amount,
     }));
     const expenditureRows: Row[] = ex.map((e) => ({
@@ -323,7 +320,6 @@ export default function Reports() {
       company: companies.find((c) => c.id === e.companyId)?.name ?? "—",
       project: project(e.projectId)?.name ?? "—",
       fy: years.find((y) => y.id === e.financialYearId)?.name ?? "—",
-      detail: natureLabel(e),
       baseAmount: e.amount,
     }));
     let running = 0;
@@ -512,7 +508,7 @@ export default function Reports() {
     } else {
       downloadCsv(
         "transaction-ledger",
-        ["Type", "Date", "Project ID", "Project", "Company", "FY", "Nature of Expense", "Amount", "Running Balance"],
+        ["Type", "Date", "Project ID", "Project", "Company", "FY", "Amount", "Running Balance"],
         ledgerRows.map((r) => [
           r.type === "receipt" ? "Receipt" : "Expenditure",
           r.date,
@@ -520,7 +516,6 @@ export default function Reports() {
           r.project,
           r.company,
           r.fy,
-          r.detail,
           r.baseAmount,
           r.runningBalance,
         ]),
@@ -651,7 +646,7 @@ export default function Reports() {
                   4: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
                   5: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
                 }}
-                options={{ searching: false, order: [] }}
+                options={{ searching: true, order: [] }}
               />
             </Card>
           </>
@@ -703,7 +698,7 @@ export default function Reports() {
                   2: (_v, row) => <span className="text-danger">{formatINR(row.expenditure)}</span>,
                   3: (_v, row) => <span className="text-success">{formatINR(row.balance)}</span>,
                 }}
-                options={{ searching: false, order: [] }}
+                options={{ searching: true, order: [] }}
               />
             </Card>
           </>
@@ -756,7 +751,7 @@ export default function Reports() {
                   7: (_v, row) => <span className="text-danger">{formatINR(row.spent)}</span>,
                   9: (_v, row) => <StatusBadge status={row.status} />,
                 }}
-                options={{ searching: false, order: [] }}
+                options={{ searching: true, order: [] }}
               />
             </Card>
           </>
@@ -821,7 +816,7 @@ export default function Reports() {
                         ),
                       5: (_v, row) => <span className="font-semibold text-success">{formatINR(row.carryForward)}</span>,
                     }}
-                    options={{ searching: false, order: [] }}
+                    options={{ searching: true, order: [] }}
                   />
                 </>
               )}
@@ -863,7 +858,6 @@ export default function Reports() {
                   { data: "project", title: "Project" },
                   { data: "company", title: "Company" },
                   { data: "fy", title: "FY" },
-                  { data: "detail", title: "Nature of Expense" },
                   { data: "baseAmount", title: "Amount", className: "text-right", render: money },
                   { data: "runningBalance", title: "Running Balance", className: "text-right", render: money },
                 ]}
@@ -875,10 +869,10 @@ export default function Reports() {
                       <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">Expenditure</span>
                     ),
                   2: (_v, row) => <span className="font-mono text-xs text-muted">{row.code}</span>,
-                  7: (_v, row) => (
+                  6: (_v, row) => (
                     <span className={row.type === "receipt" ? "text-success" : "text-danger"}>{formatINR(row.baseAmount)}</span>
                   ),
-                  8: (_v, row) => <span className="font-semibold text-ink">{formatINR(row.runningBalance)}</span>,
+                  7: (_v, row) => <span className="font-semibold text-ink">{formatINR(row.runningBalance)}</span>,
                 }}
                 options={{ searching: true, order: [] }}
               />

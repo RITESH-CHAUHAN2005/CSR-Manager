@@ -9,7 +9,7 @@ export interface ICompany extends Document {
   email: string
   phone: string
   address: string
-  notes: string
+  description: string
 }
 
 const companySchema = new Schema<ICompany>(
@@ -23,7 +23,8 @@ const companySchema = new Schema<ICompany>(
     email: { type: String, default: '', lowercase: true, trim: true },
     phone: { type: String, default: '', trim: true },
     address: { type: String, default: '', trim: true },
-    notes: { type: String, default: '', trim: true },
+    // Replaced the old `notes` field — one free-text field is enough.
+    description: { type: String, default: '', trim: true },
   },
   { timestamps: true, toJSON: baseToJSON },
 )

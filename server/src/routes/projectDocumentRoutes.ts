@@ -7,10 +7,12 @@ import { ApiError } from '../utils/ApiError.js'
 import { ProjectDocument } from '../models/ProjectDocument.js'
 
 // Documents live in MongoDB (see ProjectDocument model) rather than on disk — the
-// hosting free tier has no persistent disk. Capped at 5 files/project and 8MB/file
-// to keep the free-tier MongoDB Atlas storage quota (512MB) safe.
-const MAX_DOCS_PER_PROJECT = 5
-const MAX_FILE_SIZE = 8 * 1024 * 1024
+// hosting free tier has no persistent disk.
+//
+// There is NO limit on how many files a project can carry. The per-file size cap is not
+// a policy choice and cannot be lifted: the file's bytes are a field inside the document,
+// and MongoDB rejects any document over 16MB. 15MB leaves room for the metadata.
+const MAX_FILE_SIZE = 15 * 1024 * 1024
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } })
 
@@ -43,10 +45,6 @@ router.post(
   uploadSingle,
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded')
-    const count = await ProjectDocument.countDocuments({ projectId: req.params.projectId })
-    if (count >= MAX_DOCS_PER_PROJECT) {
-      throw new ApiError(409, `Maximum ${MAX_DOCS_PER_PROJECT} documents per project`)
-    }
     const doc = await ProjectDocument.create({
       projectId: req.params.projectId,
       filename: req.file.originalname,

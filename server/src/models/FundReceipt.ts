@@ -14,7 +14,7 @@ export interface IFundReceipt extends Document {
   mode?: 'NEFT' | 'RTGS' | 'Cheque' | ''
   carryForward: number
   amount: number
-  notes?: string
+  description?: string
 }
 
 const fundReceiptSchema = new Schema<IFundReceipt>(
@@ -36,7 +36,8 @@ const fundReceiptSchema = new Schema<IFundReceipt>(
     mode: { type: String, enum: ['NEFT', 'RTGS', 'Cheque', ''], default: '' },
     carryForward: { type: Number, default: 0, min: 0 },
     amount: { type: Number, required: true, min: 0 },
-    notes: { type: String, default: '', trim: true },
+    // Replaced the old `notes` field — one free-text field is enough.
+    description: { type: String, default: '', trim: true },
     ...createdByFields,
   },
   { timestamps: true, toJSON: baseToJSON },

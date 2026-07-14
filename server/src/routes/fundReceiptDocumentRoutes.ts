@@ -6,9 +6,9 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { FundReceiptDocument } from '../models/FundReceiptDocument.js'
 
-// Mirrors projectDocumentRoutes.ts — same 5 files/8MB caps, same shape.
-const MAX_DOCS_PER_RECEIPT = 5
-const MAX_FILE_SIZE = 8 * 1024 * 1024
+// Mirrors projectDocumentRoutes.ts — no cap on the number of files; the 15MB per-file
+// cap is MongoDB's 16MB document limit, not a policy.
+const MAX_FILE_SIZE = 15 * 1024 * 1024
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE } })
 
@@ -41,10 +41,6 @@ router.post(
   uploadSingle,
   asyncHandler(async (req: Request, res: Response) => {
     if (!req.file) throw new ApiError(400, 'No file uploaded')
-    const count = await FundReceiptDocument.countDocuments({ fundReceiptId: req.params.fundReceiptId })
-    if (count >= MAX_DOCS_PER_RECEIPT) {
-      throw new ApiError(409, `Maximum ${MAX_DOCS_PER_RECEIPT} documents per receipt`)
-    }
     const doc = await FundReceiptDocument.create({
       fundReceiptId: req.params.fundReceiptId,
       filename: req.file.originalname,

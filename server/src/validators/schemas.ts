@@ -54,7 +54,7 @@ export const companySchema = z.object({
   email: z.union([z.string().email(), z.literal('')]).optional().default(''),
   phone: z.string().max(40).optional().default(''),
   address: z.string().max(400).optional().default(''),
-  notes: z.string().max(2000).optional().default(''),
+  description: z.string().max(2000).optional().default(''),
 })
 
 export const financialYearSchema = z.object({
@@ -94,17 +94,13 @@ export const projectSchema = z
       .optional()
       .default('')
       .transform((v) => v || undefined),
-    notes: z.string().max(2000).optional().default(''),
   })
-  // For clarity, an On Hold or Cancelled project must carry a reason in either the
-  // description or the notes so reviewers know why it was paused/stopped.
+  // For clarity, an On Hold or Cancelled project must carry a reason in its description
+  // so reviewers know why it was paused/stopped.
   .refine(
-    (d) =>
-      !['on_hold', 'cancelled'].includes(d.status) ||
-      Boolean(d.description?.trim()) ||
-      Boolean(d.notes?.trim()),
+    (d) => !['on_hold', 'cancelled'].includes(d.status) || Boolean(d.description?.trim()),
     {
-      message: 'Add a description or notes explaining why the project is On Hold or Cancelled.',
+      message: 'Add a description explaining why the project is On Hold or Cancelled.',
       path: ['description'],
     },
   )
@@ -132,7 +128,7 @@ export const fundReceiptSchema = z
     mode: z.enum(['NEFT', 'RTGS', 'Cheque', '']).optional().default(''),
     carryForward: money.optional().default(0),
     amount: money,
-    notes: z.string().max(2000).optional().default(''),
+    description: z.string().max(2000).optional().default(''),
   })
   .transform((d) => ({ ...d, companyId: d.companyId || undefined }))
   .refine((d) => Boolean(d.companyId), {
@@ -159,70 +155,18 @@ export const masterDataItemSchema = z.object({
   description: z.string().max(2000).optional().default(''),
 })
 
-const capitalAssetSchema = z.object({
-  particulars: z.string().max(300).optional().default(''),
-  address: z.string().max(400).optional().default(''),
-  district: z.string().max(120).optional().default(''),
-  state: z.string().max(120).optional().default(''),
-  pinCode: z.string().max(10).optional().default(''),
-  dateOfCreation: z.string().max(20).optional().default(''),
+// The F.Expense record: which project (by Project ID), whose money, how much, and when.
+// Carry-forward is NOT recorded here — it is derived from funds received against a
+// project minus what has been spent on it.
+export const expenditureSchema = z.object({
+  // Money can't be spent in the future. Same site-wide rule as a project's start date
+  // and a receipt's date.
+  date: notFutureDate('Date of spend'),
+  projectId: objectId,
+  companyId: objectId,
+  financialYearId: objectId,
+  approvedBy: z.string().max(120).optional().default(''),
+  amount: money,
+  description: z.string().max(2000).optional().default(''),
+  reference: z.string().max(120).optional().default(''),
 })
-
-// The F.Expense record: which project (by Project ID), which company's money, what
-// kind of spend, how much, when, and whether it was spent directly or routed through
-// the project's Intervention Partner. Carry-forward is NOT recorded here — it is
-// derived from funds received against a project minus what has been spent on it.
-export const expenditureSchema = z
-  .object({
-    date: isoDate,
-    projectId: objectId,
-    companyId: objectId,
-    financialYearId: objectId,
-    natureOfExpense: z
-      .enum([
-        'project_intervention',
-        'administrative_overheads',
-        'impact_assessment',
-        'capital_asset',
-        'other',
-      ])
-      .default('project_intervention'),
-    otherNature: z.string().max(160).optional().default(''),
-    capitalAsset: capitalAssetSchema.optional().default({}),
-    fundingRoute: z.enum(['direct', 'intervention_partner']).default('direct'),
-    approvedBy: z.string().max(120).optional().default(''),
-    amount: money,
-    description: z.string().max(2000).optional().default(''),
-    reference: z.string().max(120).optional().default(''),
-  })
-  // "Any Other" is only meaningful if you say what it is.
-  .refine((d) => d.natureOfExpense !== 'other' || Boolean(d.otherNature?.trim()), {
-    message: 'Specify the nature of the expense',
-    path: ['otherNature'],
-  })
-  // A capital asset has to be identifiable and locatable — that is the whole point of
-  // recording it separately from an ordinary project spend.
-  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.particulars?.trim()), {
-    message: 'Short particulars of the asset are required',
-    path: ['capitalAsset', 'particulars'],
-  })
-  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.address?.trim()), {
-    message: 'Complete address of the asset is required',
-    path: ['capitalAsset', 'address'],
-  })
-  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.district?.trim()), {
-    message: 'District is required',
-    path: ['capitalAsset', 'district'],
-  })
-  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.state?.trim()), {
-    message: 'State is required',
-    path: ['capitalAsset', 'state'],
-  })
-  .refine((d) => d.natureOfExpense !== 'capital_asset' || /^\d{6}$/.test(d.capitalAsset?.pinCode ?? ''), {
-    message: 'PIN code must be 6 digits',
-    path: ['capitalAsset', 'pinCode'],
-  })
-  .refine(
-    (d) => d.natureOfExpense !== 'capital_asset' || /^\d{4}-\d{2}-\d{2}/.test(d.capitalAsset?.dateOfCreation ?? ''),
-    { message: 'Date of creation is required', path: ['capitalAsset', 'dateOfCreation'] },
-  )

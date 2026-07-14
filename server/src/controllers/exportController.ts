@@ -9,7 +9,6 @@ import { FundReceipt } from '../models/FundReceipt.js'
 import { Expenditure } from '../models/Expenditure.js'
 import { findCurrentFinancialYear } from '../utils/financialYear.js'
 import { carryForwardByCompany, carryForwardRows, yearFundFlow } from '../utils/carryForward.js'
-import { NATURE_LABELS, ROUTE_LABELS } from '../utils/expenseLabels.js'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const inr = (n: number) =>
@@ -225,7 +224,6 @@ async function ledgerReport(): Promise<ReportSpec> {
       company: r.receiptType === 'other_source' ? r.source || 'Other Source' : companyName(r.companyId),
       project: projectName(r.projectId),
       fy: yearName(r.financialYearId),
-      detail: '—',
       base: r.amount,
     })),
     ...expenditures.map((e) => ({
@@ -235,7 +233,6 @@ async function ledgerReport(): Promise<ReportSpec> {
       company: companyName(e.companyId),
       project: projectName(e.projectId),
       fy: yearName(e.financialYearId),
-      detail: NATURE_LABELS[e.natureOfExpense] ?? String(e.natureOfExpense),
       base: e.amount,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date))
@@ -243,77 +240,23 @@ async function ledgerReport(): Promise<ReportSpec> {
   let running = 0
   const rows = merged.map((r) => {
     running += r.type === 'Receipt' ? r.base : -r.base
-    return [r.type, r.date, r.code, r.project, r.company, r.fy, r.detail, r.base, running]
+    return [r.type, r.date, r.code, r.project, r.company, r.fy, r.base, running]
   })
 
   return {
     title: 'Master Transaction Ledger',
     filename: 'transaction-ledger',
     columns: [
-      { header: 'Type', width: 75, kind: 'text' },
-      { header: 'Date', width: 75, kind: 'text' },
-      { header: 'Project ID', width: 85, kind: 'text' },
-      { header: 'Project', width: 130, kind: 'text' },
-      { header: 'Company', width: 130, kind: 'text' },
-      { header: 'FY', width: 75, kind: 'text' },
-      { header: 'Nature of Expense', width: 115, kind: 'text' },
-      { header: 'Amount', width: 95, kind: 'money' },
-      { header: 'Running Balance', width: 100, kind: 'money' },
+      { header: 'Type', width: 85, kind: 'text' },
+      { header: 'Date', width: 85, kind: 'text' },
+      { header: 'Project ID', width: 95, kind: 'text' },
+      { header: 'Project', width: 145, kind: 'text' },
+      { header: 'Company', width: 145, kind: 'text' },
+      { header: 'FY', width: 85, kind: 'text' },
+      { header: 'Amount', width: 105, kind: 'money' },
+      { header: 'Running Balance', width: 110, kind: 'money' },
     ],
     rows,
-  }
-}
-
-// The F.Expense register: every expenditure, in full, as the statute wants it.
-async function expenditureReport(): Promise<ReportSpec> {
-  const [expenditures, companies, projects, years] = await Promise.all([
-    Expenditure.find().sort({ date: 1 }),
-    Company.find(),
-    Project.find(),
-    FinancialYear.find(),
-  ])
-  const companyName = (id: unknown) => companies.find((c) => String(c._id) === String(id))?.name ?? '—'
-  const project = (id: unknown) => projects.find((p) => String(p._id) === String(id))
-  const yearName = (id: unknown) => years.find((y) => String(y._id) === String(id))?.name ?? '—'
-
-  const rows = expenditures.map((e) => {
-    const p = project(e.projectId)
-    const asset = e.natureOfExpense === 'capital_asset' ? e.capitalAsset : undefined
-    return [
-      p?.projectCode || '—',
-      p?.name ?? '—',
-      companyName(e.companyId),
-      yearName(e.financialYearId),
-      e.natureOfExpense === 'other' && e.otherNature
-        ? `Any Other — ${e.otherNature}`
-        : NATURE_LABELS[e.natureOfExpense] ?? String(e.natureOfExpense),
-      ROUTE_LABELS[e.fundingRoute] ?? String(e.fundingRoute),
-      e.date,
-      e.amount,
-      asset?.particulars || '—',
-      [asset?.address, asset?.district, asset?.state, asset?.pinCode].filter(Boolean).join(', ') || '—',
-      asset?.dateOfCreation || '—',
-    ]
-  })
-
-  return {
-    title: 'Expenditure Register (F.Expense)',
-    filename: 'expenditure-register',
-    columns: [
-      { header: 'Project ID', width: 70, kind: 'text' },
-      { header: 'Project', width: 95, kind: 'text' },
-      { header: 'Company', width: 95, kind: 'text' },
-      { header: 'FY', width: 60, kind: 'text' },
-      { header: 'Nature of Expense', width: 95, kind: 'text' },
-      { header: 'Direct / Partner', width: 85, kind: 'text' },
-      { header: 'Date of Spend', width: 70, kind: 'text' },
-      { header: 'Amount Spent', width: 85, kind: 'money' },
-      { header: 'Asset Particulars', width: 95, kind: 'text' },
-      { header: 'Asset Location', width: 110, kind: 'text' },
-      { header: 'Asset Created', width: 70, kind: 'text' },
-    ],
-    rows,
-    totals: ['Total', '', '', '', '', '', '', sum(rows.map((r) => Number(r[7]))), '', '', ''],
   }
 }
 
@@ -322,7 +265,6 @@ async function buildReport(type: string): Promise<ReportSpec> {
   if (type === 'project') return projectReport()
   if (type === 'carryForward') return carryForwardReport()
   if (type === 'ledger') return ledgerReport()
-  if (type === 'expenditure') return expenditureReport()
   return yearReport()
 }
 
