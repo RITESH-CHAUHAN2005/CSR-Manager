@@ -8,6 +8,8 @@ import { FinancialYear } from '../models/FinancialYear.js'
 import { FundReceipt } from '../models/FundReceipt.js'
 import { Expenditure } from '../models/Expenditure.js'
 import { findCurrentFinancialYear } from '../utils/financialYear.js'
+import { carryForwardByCompany, carryForwardRows, yearFundFlow } from '../utils/carryForward.js'
+import { NATURE_LABELS, ROUTE_LABELS } from '../utils/expenseLabels.js'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const inr = (n: number) =>
@@ -35,16 +37,16 @@ async function yearReport(): Promise<ReportSpec> {
     FundReceipt.find(),
     Expenditure.find(),
   ])
-  const rows = years.map((y) => {
-    const id = String(y._id)
-    const fundsReceived = sum(receipts.filter((r) => String(r.financialYearId) === id).map((r) => r.amount))
-    const carryForwardIn = sum(receipts.filter((r) => String(r.financialYearId) === id).map((r) => r.carryForward))
-    const expenditure = sum(expenditures.filter((e) => String(e.financialYearId) === id).map((e) => e.amount))
-    const totalAvailable = fundsReceived + carryForwardIn
-    const balance = totalAvailable - expenditure
-    return [y.name, fundsReceived, carryForwardIn, totalAvailable, expenditure, balance, balance]
-  })
-  const col = (i: number) => sum(rows.map((r) => Number(r[i])))
+  const flow = yearFundFlow({ years, receipts, expenditures })
+  const rows = flow.map((r) => [
+    r.yearName,
+    r.fundsReceived,
+    r.carryForwardIn,
+    r.totalAvailable,
+    r.expenditure,
+    r.balance,
+    r.carryForwardOut,
+  ])
   return {
     title: 'Year-wise Financial Report',
     filename: 'year-wise-report',
@@ -58,7 +60,17 @@ async function yearReport(): Promise<ReportSpec> {
       { header: 'Carry Forward Out', width: 105, kind: 'money' },
     ],
     rows,
-    totals: ['Total', col(1), col(2), col(3), col(4), col(5), col(6)],
+    // Carry Forward In/Out and Total Available are running positions, not flows —
+    // summing them down the column would be meaningless, so only the flows are totalled.
+    totals: [
+      'Total',
+      sum(flow.map((r) => r.fundsReceived)),
+      '',
+      '',
+      sum(flow.map((r) => r.expenditure)),
+      flow.at(-1)?.balance ?? 0,
+      flow.at(-1)?.carryForwardOut ?? 0,
+    ],
   }
 }
 
@@ -69,28 +81,29 @@ async function companyReport(): Promise<ReportSpec> {
     Expenditure.find(),
     Project.find(),
   ])
+  const carried = carryForwardByCompany(carryForwardRows({ projects, companies, receipts, expenditures }))
   const rows = companies.map((c) => {
     const id = String(c._id)
     const received = sum(receipts.filter((r) => String(r.companyId) === id).map((r) => r.amount))
     const myProjects = projects.filter((p) => p.companyIds.some((cid) => String(cid) === id))
-    const myExpenditures = expenditures.filter((e) => String(e.companyId) === id)
-    const carry =
-      sum(receipts.filter((r) => String(r.companyId) === id).map((r) => r.carryForward)) +
-      sum(myExpenditures.map((e) => e.carryForwardAmount))
-    const expenditure = sum(myExpenditures.map((e) => e.amount))
-    return [c.name, received, carry, expenditure, received + carry - expenditure, myProjects.length]
+    const expenditure = sum(
+      expenditures.filter((e) => String(e.companyId) === id).map((e) => e.amount),
+    )
+    // Carry Forward = unspent money on this company's Ongoing projects. It is part of
+    // the balance, not an addition to it.
+    return [c.name, received, expenditure, received - expenditure, carried.get(id) ?? 0, myProjects.length]
   })
   const col = (i: number) => sum(rows.map((r) => Number(r[i])))
   return {
     title: 'Company-wise Financial Report',
     filename: 'company-wise-report',
     columns: [
-      { header: 'Company', width: 200, kind: 'text' },
-      { header: 'Total Received', width: 115, kind: 'money' },
-      { header: 'Carry Forward', width: 115, kind: 'money' },
-      { header: 'Expenditure', width: 115, kind: 'money' },
-      { header: 'Balance', width: 115, kind: 'money' },
-      { header: 'Projects', width: 80, kind: 'number' },
+      { header: 'Company', width: 190, kind: 'text' },
+      { header: 'Total Received', width: 110, kind: 'money' },
+      { header: 'Expenditure', width: 110, kind: 'money' },
+      { header: 'Balance', width: 110, kind: 'money' },
+      { header: 'Carry Forward', width: 110, kind: 'money' },
+      { header: 'Projects', width: 70, kind: 'number' },
     ],
     rows,
     totals: ['Total', col(1), col(2), col(3), col(4), col(5)],
@@ -115,19 +128,31 @@ async function projectReport(): Promise<ReportSpec> {
         .map((c) => c.name)
         .join(', ') || '—'
     const utilization = p.budget ? Math.round((spent / p.budget) * 100) : 0
-    return [p.name, companyNames, p.budget, received, spent, utilization, p.status]
+    return [
+      p.projectCode || '—',
+      p.name,
+      companyNames,
+      p.interventionPartner || '—',
+      p.budget,
+      received,
+      spent,
+      utilization,
+      p.status,
+    ]
   })
   return {
     title: 'Project-wise Financial Report',
     filename: 'project-wise-report',
     columns: [
-      { header: 'Project', width: 130, kind: 'text' },
-      { header: 'Company', width: 130, kind: 'text' },
-      { header: 'Budget', width: 100, kind: 'money' },
-      { header: 'Received', width: 100, kind: 'money' },
-      { header: 'Spent', width: 100, kind: 'money' },
-      { header: 'Utilization', width: 80, kind: 'percent' },
-      { header: 'Status', width: 80, kind: 'text' },
+      { header: 'Project ID', width: 85, kind: 'text' },
+      { header: 'Project', width: 125, kind: 'text' },
+      { header: 'Company', width: 125, kind: 'text' },
+      { header: 'Intervention Partner', width: 115, kind: 'text' },
+      { header: 'Budget', width: 90, kind: 'money' },
+      { header: 'Received', width: 90, kind: 'money' },
+      { header: 'Spent', width: 90, kind: 'money' },
+      { header: 'Utilization', width: 70, kind: 'percent' },
+      { header: 'Status', width: 70, kind: 'text' },
     ],
     rows,
   }
@@ -149,46 +174,32 @@ async function carryForwardReport(): Promise<ReportSpec> {
     : undefined
   const rollsInto = nextFy?.name ?? '—'
 
-  const rows: (string | number)[][] = []
-  projects
-    .filter((p) => p.derivedStatus === 'ongoing')
-    .forEach((p) => {
-      const id = String(p._id)
-      const projectCF = sum(expenditures.filter((e) => String(e.projectId) === id).map((e) => e.carryForwardAmount))
-      if (projectCF <= 0) return
-      // Derived from actual Fund Receipts against this project, not a manually
-      // entered figure — the single source of truth for "who put in how much".
-      const contributionTotals = new Map<string, number>()
-      receipts
-        .filter((r) => String(r.projectId) === id && r.receiptType === 'company' && r.companyId)
-        .forEach((r) => {
-          const key = String(r.companyId)
-          contributionTotals.set(key, (contributionTotals.get(key) ?? 0) + r.amount)
-        })
-      const totalContrib = sum([...contributionTotals.values()])
-      if (totalContrib <= 0) {
-        rows.push([p.name, 'Unattributed', 0, projectCF, rollsInto])
-        return
-      }
-      contributionTotals.forEach((amount, companyId) => {
-        const companyName = companies.find((co) => String(co._id) === companyId)?.name ?? '—'
-        const pct = Math.round((amount / totalContrib) * 100)
-        const share = projectCF * (amount / totalContrib)
-        rows.push([p.name, companyName, pct, share, rollsInto])
-      })
-    })
+  const cf = carryForwardRows({ projects, companies, receipts, expenditures })
+  const rows = cf.map((r) => [
+    r.projectCode || '—',
+    r.projectName,
+    r.companyName,
+    r.received,
+    r.spent,
+    r.carryForward,
+    rollsInto,
+  ])
+  const col = (i: number) => sum(rows.map((r) => Number(r[i])))
 
   return {
     title: 'Project Carry Forward Report',
     filename: 'carry-forward-report',
     columns: [
+      { header: 'Project ID', width: 90, kind: 'text' },
       { header: 'Project', width: 150, kind: 'text' },
-      { header: 'Company', width: 160, kind: 'text' },
-      { header: 'Contribution %', width: 100, kind: 'percent' },
-      { header: 'Carry Forward Share', width: 120, kind: 'money' },
-      { header: 'Rolls Into', width: 100, kind: 'text' },
+      { header: 'Company', width: 150, kind: 'text' },
+      { header: 'Received', width: 105, kind: 'money' },
+      { header: 'Spent', width: 105, kind: 'money' },
+      { header: 'Carry Forward', width: 110, kind: 'money' },
+      { header: 'Rolls Into', width: 95, kind: 'text' },
     ],
     rows,
+    totals: ['Total', '', '', col(3), col(4), col(5), ''],
   }
 }
 
@@ -201,50 +212,108 @@ async function ledgerReport(): Promise<ReportSpec> {
     FinancialYear.find(),
   ])
   const companyName = (id: unknown) => companies.find((c) => String(c._id) === String(id))?.name ?? '—'
-  const projectName = (id: unknown) => (id ? projects.find((p) => String(p._id) === String(id))?.name ?? '—' : '—')
+  const project = (id: unknown) => projects.find((p) => String(p._id) === String(id))
+  const projectName = (id: unknown) => (id ? project(id)?.name ?? '—' : '—')
+  const projectCode = (id: unknown) => (id ? project(id)?.projectCode || '—' : '—')
   const yearName = (id: unknown) => years.find((y) => String(y._id) === String(id))?.name ?? '—'
 
   const merged = [
     ...receipts.map((r) => ({
       type: 'Receipt',
       date: r.date,
+      code: projectCode(r.projectId),
       company: r.receiptType === 'other_source' ? r.source || 'Other Source' : companyName(r.companyId),
       project: projectName(r.projectId),
       fy: yearName(r.financialYearId),
+      detail: '—',
       base: r.amount,
-      carry: r.carryForward ?? 0,
     })),
     ...expenditures.map((e) => ({
       type: 'Expenditure',
       date: e.date,
+      code: projectCode(e.projectId),
       company: companyName(e.companyId),
       project: projectName(e.projectId),
       fy: yearName(e.financialYearId),
+      detail: NATURE_LABELS[e.natureOfExpense] ?? String(e.natureOfExpense),
       base: e.amount,
-      carry: e.carryForwardAmount ?? 0,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   let running = 0
   const rows = merged.map((r) => {
     running += r.type === 'Receipt' ? r.base : -r.base
-    return [r.type, r.date, r.company, r.project, r.fy, r.base, r.carry, running]
+    return [r.type, r.date, r.code, r.project, r.company, r.fy, r.detail, r.base, running]
   })
 
   return {
     title: 'Master Transaction Ledger',
     filename: 'transaction-ledger',
     columns: [
-      { header: 'Type', width: 90, kind: 'text' },
-      { header: 'Date', width: 90, kind: 'text' },
-      { header: 'Company', width: 150, kind: 'text' },
-      { header: 'Project', width: 150, kind: 'text' },
-      { header: 'FY', width: 90, kind: 'text' },
-      { header: 'Base Amount', width: 105, kind: 'money' },
-      { header: 'Carry Forward', width: 105, kind: 'money' },
-      { header: 'Total Balance', width: 105, kind: 'money' },
+      { header: 'Type', width: 75, kind: 'text' },
+      { header: 'Date', width: 75, kind: 'text' },
+      { header: 'Project ID', width: 85, kind: 'text' },
+      { header: 'Project', width: 130, kind: 'text' },
+      { header: 'Company', width: 130, kind: 'text' },
+      { header: 'FY', width: 75, kind: 'text' },
+      { header: 'Nature of Expense', width: 115, kind: 'text' },
+      { header: 'Amount', width: 95, kind: 'money' },
+      { header: 'Running Balance', width: 100, kind: 'money' },
     ],
     rows,
+  }
+}
+
+// The F.Expense register: every expenditure, in full, as the statute wants it.
+async function expenditureReport(): Promise<ReportSpec> {
+  const [expenditures, companies, projects, years] = await Promise.all([
+    Expenditure.find().sort({ date: 1 }),
+    Company.find(),
+    Project.find(),
+    FinancialYear.find(),
+  ])
+  const companyName = (id: unknown) => companies.find((c) => String(c._id) === String(id))?.name ?? '—'
+  const project = (id: unknown) => projects.find((p) => String(p._id) === String(id))
+  const yearName = (id: unknown) => years.find((y) => String(y._id) === String(id))?.name ?? '—'
+
+  const rows = expenditures.map((e) => {
+    const p = project(e.projectId)
+    const asset = e.natureOfExpense === 'capital_asset' ? e.capitalAsset : undefined
+    return [
+      p?.projectCode || '—',
+      p?.name ?? '—',
+      companyName(e.companyId),
+      yearName(e.financialYearId),
+      e.natureOfExpense === 'other' && e.otherNature
+        ? `Any Other — ${e.otherNature}`
+        : NATURE_LABELS[e.natureOfExpense] ?? String(e.natureOfExpense),
+      ROUTE_LABELS[e.fundingRoute] ?? String(e.fundingRoute),
+      e.date,
+      e.amount,
+      asset?.particulars || '—',
+      [asset?.address, asset?.district, asset?.state, asset?.pinCode].filter(Boolean).join(', ') || '—',
+      asset?.dateOfCreation || '—',
+    ]
+  })
+
+  return {
+    title: 'Expenditure Register (F.Expense)',
+    filename: 'expenditure-register',
+    columns: [
+      { header: 'Project ID', width: 70, kind: 'text' },
+      { header: 'Project', width: 95, kind: 'text' },
+      { header: 'Company', width: 95, kind: 'text' },
+      { header: 'FY', width: 60, kind: 'text' },
+      { header: 'Nature of Expense', width: 95, kind: 'text' },
+      { header: 'Direct / Partner', width: 85, kind: 'text' },
+      { header: 'Date of Spend', width: 70, kind: 'text' },
+      { header: 'Amount Spent', width: 85, kind: 'money' },
+      { header: 'Asset Particulars', width: 95, kind: 'text' },
+      { header: 'Asset Location', width: 110, kind: 'text' },
+      { header: 'Asset Created', width: 70, kind: 'text' },
+    ],
+    rows,
+    totals: ['Total', '', '', '', '', '', '', sum(rows.map((r) => Number(r[7]))), '', '', ''],
   }
 }
 
@@ -253,10 +322,13 @@ async function buildReport(type: string): Promise<ReportSpec> {
   if (type === 'project') return projectReport()
   if (type === 'carryForward') return carryForwardReport()
   if (type === 'ledger') return ledgerReport()
+  if (type === 'expenditure') return expenditureReport()
   return yearReport()
 }
 
 function fmtCell(value: string | number, kind: ColKind): string {
+  // A blank cell stays blank — a running-position column has no meaningful total.
+  if (value === '' || value === null || value === undefined) return ''
   if (kind === 'money') return inr(Number(value))
   if (kind === 'percent') return `${value}%`
   return String(value)

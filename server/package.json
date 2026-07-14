@@ -11,6 +11,7 @@
     "clean": "tsx src/cleanDb.ts",
     "backup": "tsx src/backupDb.ts",
     "migrate:project-schema": "tsx src/migrateProjectSchema.ts",
+    "migrate:csr-compliance": "tsx src/migrateCsrCompliance.ts",
     "seed:financial-years": "tsx src/seedFinancialYears.ts",
     "test": "tsx test/smoke.mts",
     "typecheck": "tsc --noEmit"

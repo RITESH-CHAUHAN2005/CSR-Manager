@@ -13,7 +13,9 @@
 Seven collections. Anything an app screen shows is either one of these fields or is derived from them at read time — **no totals, balances, or "spent" figures are stored**.
 
 ### Company
-`name` (required) · `cin` · `contactPerson` · `email` · `phone` · `address` · `notes`
+`name` (required) · `cin` · `pan` · `contactPerson` · `email` · `phone` · `address` · `notes`
+
+- **`pan`** — the company's Permanent Account Number. Optional, but when supplied it must match `[A-Z]{5}[0-9]{4}[A-Z]` (e.g. `AAACT2727Q`) or the write is rejected with a 422. Stored uppercase. Shown as a column on the Companies list and on Company Detail. **[APP TODO]** — add PAN to the company form, list and detail.
 
 ### FinancialYear
 `name` ("FY 2025-26") · `startDate` · `endDate` · `isActive`
@@ -21,8 +23,10 @@ Seven collections. Anything an app screen shows is either one of these fields or
 Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one year can be active at the same time** — this is intentional, not a bug.
 
 ### Project
-`name` (required) · `companyIds[]` · `budget` · `category` · `location` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `financialYearId` · `description` · `notes`
+`name` (required) · `projectCode` · `companyIds[]` · `budget` · `category` · `location` · `interventionPartner` · `status` · `derivedStatus` · `startDate` (required) · `endDate` · `financialYearId` · `description` · `notes`
 
+- **`projectCode` is the Project ID** shown wherever a project is referenced (lists, expenditures, receipts, reports, exports): the first 4 letters of the name + the start year of its financial year, e.g. `RURA2025`. Two projects can never share one — a clash gets `-2`, `-3`. **Never sent by the client**; the server issues it, exactly like `endDate` and `financialYearId`. It is stable across renames, and is only re-issued if the project's financial year changes. Everything still links by `_id`, never by code. **[APP TODO]** — show the Project ID everywhere a project appears; never let the user type it.
+- **`interventionPartner`** — free text: the implementing agency/NGO delivering the project, when it isn't run directly. Editable, optional. Each expenditure records whether that spend went Direct or through this partner. **[APP TODO]** — add the field to the project form and detail.
 - A project is funded by **one or more companies**.
 - **`financialYearId`** is the financial year the project belongs to. It is **not entered by the user** — the server sets it automatically to the FY the **start date** falls into (the same FY used to derive `endDate`). Read-only; shown auto-filled on the form. **[APP TODO]** — show a read-only "Financial Year" field on the Project form and a "FY" line in the list/detail; never let the user type it.
 - **`companyIds`** is just the list of funding companies. The server dedupes it on every write; there is no per-company pledged amount anywhere in the system.
@@ -40,13 +44,21 @@ Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one 
 - A receipt can carry up to **5 proof documents** (photo / PDF / doc / CSV, 8 MB each) — optional. See §8.
 - `mode` (NEFT/RTGS/Cheque) and `carryForward` are **legacy**: still read for historical records, never collected on the form. **[APP TODO]** — remove the Payment Mode dropdown and the Carry Forward field from the receipt form.
 
-### Expenditure (money out)
-`date` (required) · `projectId` (required) · `companyId` (required) · `financialYearId` (required) · `category` · `approvedBy` · `amount` (required) · `carryForwardAmount` · `description` · `reference` · `notes`
+### Expenditure (money out) — the "F.Expense" record
+`date` (required) · `projectId` (required) · `companyId` (required) · `financialYearId` (required) · `natureOfExpense` · `otherNature` · `capitalAsset{}` · `fundingRoute` · `approvedBy` · `amount` (required) · `description` · `reference`
 
-- `carryForwardAmount` = unused budget rolled into the next year. It is stored **per expenditure**, not on the project, and is **only meaningful when the project's `derivedStatus === 'ongoing'`**. The server stores `0` otherwise.
+> **⚠️ BREAKING CHANGE for the app.** `category`, `notes` and `carryForwardAmount` have been **removed** from Expenditure. Any app build that still posts them will fail validation (422) or silently drop data. The old values were folded into `description` by the migration; nothing was lost.
+
+- **`natureOfExpense`** — one of `project_intervention` | `administrative_overheads` | `impact_assessment` | `capital_asset` | `other`. Defaults to `project_intervention`.
+- **`otherNature`** — required (non-empty) when `natureOfExpense === 'other'`; ignored otherwise.
+- **`capitalAsset`** — `{ particulars, address, district, state, pinCode, dateOfCreation }`. **All six are required when `natureOfExpense === 'capital_asset'`** (`pinCode` must be 6 digits, `dateOfCreation` an ISO date); the server 422s otherwise. Cleared on any other nature.
+- **`fundingRoute`** — `direct` | `intervention_partner`: whether the money was spent by the company itself or routed through the project's Intervention Partner. `intervention_partner` only makes sense when the project actually names one.
+- **There is no carry-forward field.** Carry forward is derived — see §2.
 
 ### MasterDataItem
-`type` (`category` | `status` | `source`) · `value` — the editable dropdown value-lists.
+`type` (`category` | `status` | `source`) · `value` · `description` — the editable dropdown value-lists.
+
+- **`description`** — what the value covers. For the **Category** list this carries the full **Schedule VII** clause (Companies Act, 2013) behind the short 2–3 word label, e.g. value `Rural Development` → description `Schedule VII (x) — Rural development projects.` All 13 statutory heads are seeded. **[APP TODO]** — surface the description under each category value, and on the Category dropdown.
 
 ### User / AuditLog
 `User`: `name`, `email`, `role` (`admin` | `editor` | `viewer`), optional `companyId`. No self-registration.
@@ -64,8 +76,30 @@ These are constantly confused, and every reporting bug traces back to mixing the
 | **Budget** | The project's approved cost | `Project.budget` |
 | **Spent** | Sum of `Expenditure.amount` for the project | Derived |
 | **Utilization %** | Spent ÷ **Budget** | Derived |
+| **Carry Forward** | Money received against an **Ongoing** project that has not been spent on it | Derived — `max(0, received − spent)` per (project, company) |
 
 There is **no "committed"/"pledged" amount** in the system. A project records *which* companies fund it; how much each actually paid comes only from its Fund Receipts.
+
+### Carry forward is derived, never entered
+
+Nobody types a carry-forward figure anywhere. For every project with `derivedStatus === 'ongoing'`, per contributing company:
+
+```
+carryForward = max(0, sum(receipts for this project+company) − sum(expenditures for this project+company))
+```
+
+Both receipts and expenditures name a company, so the split is exact — nothing is apportioned pro-rata. A project that has out-spent its linked receipts carries **nothing** forward; the shortfall shows on the row as `spent > received`.
+
+Consequences the app must respect:
+
+- A receipt has to be **linked to a project** (`projectId`) for that project's carry forward to be computable. An Ongoing project with no linked receipt shows no carry-forward row, and the website says so explicitly.
+- **Company Carry Forward** = the sum of its carry-forward rows. It is a *slice of* the company's balance, **not an addition to it**:
+  `Balance = Total Received − Total Expenditure`. (The old formula, `received + carryForward − expenditure`, double-counted the same rupee. **[APP TODO]** — fix this if the app reproduces it.)
+- **Year-wise flow** chains: each financial year's closing balance becomes the next year's `carryForwardIn`.
+  `totalAvailable = carryForwardIn + fundsReceived`; `carryForwardOut = balance = totalAvailable − expenditure`.
+- Server endpoint: `GET /reports/carry-forward` → one row per (Ongoing project × company) with `projectCode`, `projectName`, `companyName`, `received`, `spent`, `carryForward`.
+
+The legacy `FundReceipt.carryForward` field is **no longer read by any report**. It is kept only so historical documents still validate.
 
 An `other_source` receipt is **not** a contribution — it never counts toward a project's "Received", even though it does count toward that company's overall `totalReceived` on the Dashboard.
 
@@ -105,13 +139,13 @@ Enforced **server-side** (`requireWrite` = admin + editor; `requireAdmin` for `/
 All of it comes from `GET /dashboard/summary` so the app and website can never drift apart. Don't recompute it client-side.
 
 ### 5.2 Companies
-- Card grid; live search over name, CIN, contact person, email.
-- **Add/Edit**: Name (required), CIN, Contact Person, Phone, Email, Address, Notes.
+- Flat table; live search over name, CIN, PAN, contact person, email.
+- **Add/Edit**: Name (required), CIN, **PAN**, Contact Person, Phone, Email, Address, Notes.
 - **Delete does NOT cascade.** Deleting a company removes only the company document — its projects, receipts and expenditures survive as orphans. **[APP TODO]** — the app's delete dialog currently *claims* it cascades. Fix the copy; don't implement a cascade.
-- **Company Detail**: contact tile · Fund Overview (Received, Carry Forward, Expenditure, Current Balance, Total/Active Projects) · Year-wise Fund Summary table · Projects table · Fund Receipts table (Date, Year, Account Number, Amount).
+- **Company Detail**: CIN + PAN under the name · contact tile · Fund Overview (Received, Carry Forward, Expenditure, Current Balance, Total/Active Projects) · Year-wise Fund Summary table · Projects table (with Project ID) · Fund Receipts table (Date, Year, Account Number, Amount).
 
-Carry Forward for a company = its receipts' legacy `carryForward` + its expenditures' `carryForwardAmount`.
-Current Balance = Received + Carry Forward − Expenditure.
+Carry Forward for a company = the sum of its derived carry-forward rows (§2).
+Current Balance = Received − Expenditure. **Carry Forward is not added to it.**
 
 ### 5.3 Financial Years
 - Cards: name, date range, "Active" pill, an independent active/inactive toggle, delete.
@@ -156,26 +190,30 @@ Shared fields: Financial Year (**active years only**), Project (optional), Recei
 - List columns: Date · Donor Company / Source · Year · Project · Account Number · Amount. Header shows record count + running total, recalculated with the filters (Company, Year, search).
 
 ### 5.6 Expenditures
-- **Project** (required) drives everything: it narrows the **Company** dropdown to that project's companies and auto-selects when there is only one.
+- **Project** (required) drives everything. It is picked as `PROJECTID — Name` and it narrows the **Company** dropdown to that project's companies.
+- Picking a project shows a read-only **position table**: one row per company with **Received / Already Spent / Remaining** against *that project*. That is what tells the user how much of each company's money is still available before they book a new spend.
 - **Financial Year** is chosen independently and is limited to **active** years. When editing a record whose year has since gone inactive, that year stays selectable so old data isn't corrupted.
-- **Carry Forward Amount** only appears when the chosen project is **Ongoing**; it is forced to `0` otherwise.
-- Also: Amount (required), Date (required), Category (Master Data), Approved By, Description, Reference, Notes, Attach Document.
-- A read-only **Contributing Companies** panel shows who has funded the project so far.
-- List: Date, Project, Company, Year, Category, Approved By, Amount. Filters: Company, Year, search.
+- **Nature of Expense** (required, defaults to Project Intervention). Choosing **Any Other** reveals a required "specify" field. Choosing **Capital Asset** reveals a required sub-form: Short particulars · Complete address · District · State · PIN code (6 digits) · Date of creation.
+- **Whether Direct or through Intervention Partner** — the partner option is disabled unless the project names an Intervention Partner.
+- **Carry Forward is shown, not entered.** For an Ongoing project the form states what will remain unspent after this entry, and warns if the amount over-spends what that company has left.
+- Also: Amount Spent (required), Date of Spend (required), Approved By, Description, Attach Document. **There is no Category and no Notes field any more.**
+- List: **Project ID**, Date of Spend, Project, Company, Year, Nature of Expense, Direct/Partner, Amount Spent. Filters: Company, Year, search (Project ID included).
 
 ### 5.7 Master Data
-Three tabs — **Category**, **Status**, **Source** — each a simple list of values with add/edit/delete. These populate the Category dropdowns (Projects, Expenditures) and the Source dropdown (Other-Source receipts). Deleting a value does not rewrite records that already use it.
+Three tabs — **Category**, **Status**, **Source** — each a list of values **with a description**, add/edit/delete. These populate the Category dropdowns (Projects, Expenditures) and the Source dropdown (Other-Source receipts). Deleting a value does not rewrite records that already use it.
+
+The **Category** list holds the 13 statutory **Schedule VII** activity heads: a short 2–3 word `value` to pick from, with the full clause as its `description`. The Project form shows the clause under the chosen category.
 
 **[APP TODO]** — this screen does not exist in the app yet.
 
 ### 5.8 Reports
 Filters: Company, Financial Year. Five tabs:
 
-1. **Transaction Ledger** — bar chart + table: Type, Date, Company, Project, FY, Base Amount, Carry Forward, running Total Balance.
-2. **Year-wise** — bar (Received / Carry In / Expenditure) + pie (expenditure share). Table: Financial Year, Funds Received, Carry Forward In, Total Available, Expenditure, Balance, Carry Forward Out.
-3. **Company-wise** — bar + pie. Table: Company, Total Received, Carry Forward, Expenditure, Balance, Projects.
-4. **Project-wise** — bar (Budget vs Spent, top 10) + pie (projects by status). Table: **Project, Company, Period, Budget, Received, Spent, Utilization %, Status**.
-5. **Carry Forward** — table: Project, Company, Contribution %, Carry Forward Share, Rolls Into. Only Ongoing projects with carry-forward > 0; the amount is split across contributing companies in proportion to what each actually paid.
+1. **Transaction Ledger** — bar chart + table: Type, Date, **Project ID**, Project, Company, FY, Nature of Expense, Amount, running Balance.
+2. **Year-wise** — bar (Received / Carry In / Expenditure) + pie (expenditure share). Table: Financial Year, Funds Received, Carry Forward In, Total Available, Expenditure, Balance, Carry Forward Out. Each year's closing balance is the next year's Carry Forward In, so those columns are running positions — **do not sum them down the column**.
+3. **Company-wise** — bar + pie. Table: Company, Total Received, Expenditure, **Balance**, **Carry Forward**, Projects (in that order — Balance is received − expenditure; Carry Forward is a slice of it).
+4. **Project-wise** — bar (Budget vs Spent, top 10, labelled by Project ID) + pie (projects by status). Table: **Project ID, Project, Company, Intervention Partner, Period, Budget, Received, Spent, Utilization %, Status**.
+5. **Carry Forward** — table: **Project ID, Project, Company, Received, Spent, Carry Forward, Rolls Into**. One row per (Ongoing project × company), derived (§2). Ongoing projects with no receipt linked to them are called out in a banner, since no carry forward can be computed for them.
 
 **Export**: server-generated **PDF** and **Excel** via `GET /reports/export/{pdf|excel}?type=<tab>`. The website falls back to browser-print / client-side CSV when the API is unavailable; the app should just use the server endpoints and hand the file to the native share sheet.
 
@@ -233,12 +271,14 @@ Reads are open to every authenticated role; writes are admin + editor. Every lis
 
 ## 7. Server-derived values — do not compute these in the app
 
-- **Project `endDate` and `financialYearId`** are never accepted from the client. The server finds the financial year that the project's **start date** falls into (not today's date, so backdated projects work), and:
+- **Project `endDate`, `financialYearId` and `projectCode`** are never accepted from the client. The server finds the financial year that the project's **start date** falls into (not today's date, so backdated projects work), and:
   - sets `financialYearId` to that FY.
-  - sets `endDate`: `derivedStatus === 'ongoing'` → end of the FY **3 years** later; otherwise → end of the FY **1 year** later.
-  - If no known FY contains the start date, both are left empty.
+  - sets `endDate`: `derivedStatus === 'ongoing'` → end of the FY **3 years** later; **otherwise → the end of the start FY itself.** A project that isn't Ongoing finishes inside the financial year it began in. (This changed: it used to be the start FY + 1 year.)
+  - issues `projectCode` (4 letters of the name + the FY's start year, `-2` on a clash). Stable across renames; re-issued only if the project's FY changes.
+  - If no known FY contains the start date, the FY falls back to the active/latest year.
 - **Project `companyIds`** is deduped on every create and update; blank ids are dropped.
-- **Dashboard and report aggregates** come from `/dashboard/summary`, `/reports/year-wise`, `/reports/company-positions`.
+- **All carry-forward figures** — never stored, never posted. See §2.
+- **Dashboard and report aggregates** come from `/dashboard/summary`, `/reports/year-wise`, `/reports/company-positions`, `/reports/carry-forward`.
 
 ## 8. Rules the server enforces (and the app must not bypass)
 

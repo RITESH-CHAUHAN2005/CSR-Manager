@@ -10,6 +10,7 @@ import {
   projectService,
 } from '../services/dataService'
 import { formatDate, formatINR } from '../lib/currency'
+import { carryForwardRows, yearFundFlow } from '../lib/carryForward'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import type { Company, Project } from '../types'
@@ -26,6 +27,7 @@ import { DataTable, type DTColumn } from '../components/DataTable'
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const money = (d: unknown, type: string) => (type === 'display' ? formatINR(Number(d)) : Number(d))
 const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
+const dash = (v: unknown, type: string) => (type === 'display' ? (v ? String(v) : '—') : v)
 
 export default function CompanyDetail() {
   const { id = '' } = useParams()
@@ -50,36 +52,39 @@ export default function CompanyDetail() {
   const myExpenditures = useMemo(() => expenditures.filter((e) => e.companyId === id), [expenditures, id])
   const myProjects = useMemo(() => projects.filter((p) => p.companyIds?.includes(id)), [projects, id])
 
-  // Fund overview totals — Carry Forward = legacy receipt carry-in + unused
-  // budget carried forward, recorded per-expenditure against Ongoing projects.
+  // Fund overview totals. Carry Forward is derived — unspent money still sitting on this
+  // company's Ongoing projects (received against them, minus spent on them). It is part
+  // of the balance, not something added to it.
   const totalReceived = sum(myReceipts.map((r) => r.amount))
-  const carryForward =
-    sum(myReceipts.map((r) => r.carryForward ?? 0)) +
-    sum(myExpenditures.map((e) => e.carryForwardAmount ?? 0))
   const totalExpenditure = sum(myExpenditures.map((e) => e.amount))
-  const currentBalance = totalReceived + carryForward - totalExpenditure
+  const currentBalance = totalReceived - totalExpenditure
+  const carryForward = useMemo(
+    () =>
+      sum(
+        carryForwardRows({ projects, companies, receipts, expenditures })
+          .filter((r) => r.companyId === id)
+          .map((r) => r.carryForward),
+      ),
+    [projects, companies, receipts, expenditures, id],
+  )
   const activeProjects = myProjects.filter((p) => p.status === 'active').length
 
-  // Year-wise fund summary — only years where this company has any activity.
-  // Projects no longer carry a financial year, so "has a project" is based on
-  // whether the project's start date falls inside the year's date range.
+  // Year-wise fund summary for this company — each year's closing balance rolls into the
+  // next year's Carry Forward In, the same chain the Reports page shows. Only years with
+  // activity are listed; "has a project" means the project started inside that year.
   const yearRows = useMemo(() => {
-    return years
-      .map((y) => {
-        const received = sum(myReceipts.filter((r) => r.financialYearId === y.id).map((r) => r.amount))
-        const carryForwardIn = sum(
-          myReceipts.filter((r) => r.financialYearId === y.id).map((r) => r.carryForward ?? 0),
-        )
-        const expenditure = sum(
-          myExpenditures.filter((e) => e.financialYearId === y.id).map((e) => e.amount),
-        )
-        const hasProject = myProjects.some(
-          (p) => p.startDate && p.startDate >= y.startDate && p.startDate <= y.endDate,
-        )
-        const balance = received + carryForwardIn - expenditure
-        return { id: y.id, name: y.name, received, carryForwardIn, expenditure, balance, hasProject }
-      })
-      .filter((r) => r.received > 0 || r.carryForwardIn > 0 || r.expenditure > 0 || r.hasProject)
+    const flow = yearFundFlow({ years, receipts: myReceipts, expenditures: myExpenditures })
+    return flow
+      .map((r) => ({
+        ...r,
+        name: r.yearName,
+        received: r.fundsReceived,
+        hasProject: myProjects.some((p) => {
+          const y = years.find((fy) => fy.id === r.financialYearId)
+          return !!y && !!p.startDate && p.startDate >= y.startDate && p.startDate <= y.endDate
+        }),
+      }))
+      .filter((r) => r.received > 0 || r.expenditure > 0 || r.hasProject)
   }, [years, myReceipts, myExpenditures, myProjects])
 
   const receiptRows = useMemo(
@@ -113,7 +118,7 @@ export default function CompanyDetail() {
   // ---- Inline edit ----
   const [editOpen, setEditOpen] = useState(false)
   const [form, setForm] = useState<Omit<Company, 'id'>>({
-    name: '', cin: '', contactPerson: '', email: '', phone: '', address: '', notes: '',
+    name: '', cin: '', pan: '', contactPerson: '', email: '', phone: '', address: '', notes: '',
   })
   const [formError, setFormError] = useState('')
   const updateM = useMutation({
@@ -128,6 +133,7 @@ export default function CompanyDetail() {
     setForm({
       name: company.name,
       cin: company.cin ?? '',
+      pan: company.pan ?? '',
       contactPerson: company.contactPerson ?? '',
       email: company.email ?? '',
       phone: company.phone ?? '',
@@ -174,7 +180,10 @@ export default function CompanyDetail() {
           </button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{company.name}</h1>
-            {company.cin && <p className="mt-0.5 text-sm text-muted">#&nbsp;{company.cin}</p>}
+            <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+              {company.cin && <span>CIN&nbsp;<span className="text-ink/80">{company.cin}</span></span>}
+              {company.pan && <span>PAN&nbsp;<span className="text-ink/80">{company.pan}</span></span>}
+            </div>
           </div>
         </div>
         {canWrite && (
@@ -282,6 +291,7 @@ export default function CompanyDetail() {
               className="display nowrap csr-dt-grid"
               data={projectRows}
               columns={[
+                { data: 'projectCode', title: 'Project ID', render: dash },
                 { data: 'name', title: 'Project' },
                 { data: 'companyNames', title: 'Companies' },
                 { data: 'category', title: 'Category' },
@@ -290,8 +300,9 @@ export default function CompanyDetail() {
                 { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
               ] as DTColumn[]}
               slots={{
-                4: (_cell, row) => <StatusBadge status={row.status} />,
-                5: (_cell, row) => (
+                0: (_cell, row) => <span className="font-mono text-xs text-muted">{row.projectCode || '—'}</span>,
+                5: (_cell, row) => <StatusBadge status={row.status} />,
+                6: (_cell, row) => (
                   <button
                     onClick={() => setViewProject(row as Project)}
                     className="text-muted hover:text-primary"
@@ -340,11 +351,13 @@ export default function CompanyDetail() {
         rows={
           viewProject
             ? [
+                { label: 'Project ID', value: viewProject.projectCode },
                 { label: 'Companies', value: companyNames(viewProject.companyIds ?? []) },
                 { label: 'Status', value: <StatusBadge status={viewProject.status} /> },
                 { label: 'Derived Status', value: viewProject.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
                 { label: 'Budget', value: formatINR(viewProject.budget) },
                 { label: 'Category', value: viewProject.category },
+                { label: 'Intervention Partner', value: viewProject.interventionPartner },
                 { label: 'Location', value: viewProject.location },
                 { label: 'Period', value: projectPeriod(viewProject) },
               ]
@@ -366,9 +379,19 @@ export default function CompanyDetail() {
           <Field label="Company Name *">
             <TextInput required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
-          <Field label="Registration / CIN Number">
-            <TextInput value={form.cin} onChange={(e) => setForm({ ...form, cin: e.target.value })} />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Registration / CIN Number">
+              <TextInput value={form.cin} onChange={(e) => setForm({ ...form, cin: e.target.value })} />
+            </Field>
+            <Field label="PAN">
+              <TextInput
+                placeholder="e.g. AAACT2727Q"
+                maxLength={10}
+                value={form.pan ?? ''}
+                onChange={(e) => setForm({ ...form, pan: e.target.value.toUpperCase() })}
+              />
+            </Field>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Contact Person">
               <TextInput value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} />

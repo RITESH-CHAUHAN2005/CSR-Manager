@@ -24,9 +24,12 @@ export function shiftIsoYears(iso: string, deltaYears: number): string {
   return shifted.toISOString().slice(0, 10)
 }
 
-// Preview of the project End Date the server will compute, given the FY the
-// chosen Start Date falls into (not today) and the Derived Status. Purely for
-// display in the Add/Edit form.
+// Preview of the project End Date the server will compute, given the FY the chosen
+// Start Date falls into (not today) and the Derived Status:
+//   Ongoing            -> 3 years past the end of the start FY
+//   Other than Ongoing -> the end of the start FY itself; a project that isn't
+//                         Ongoing finishes inside the financial year it began in
+// Purely for display in the Add/Edit form — the server derives the same value.
 export function previewProjectEndDate(
   years: FinancialYear[],
   derivedStatus: 'ongoing' | 'other',
@@ -34,5 +37,5 @@ export function previewProjectEndDate(
 ): string {
   const startFy = findCurrentFinancialYear(years, startDate || undefined)
   if (!startFy) return ''
-  return shiftIsoYears(startFy.endDate, derivedStatus === 'ongoing' ? 3 : 1)
+  return derivedStatus === 'ongoing' ? shiftIsoYears(startFy.endDate, 3) : startFy.endDate
 }

@@ -11,6 +11,7 @@ import {
 import type { DerivedStatus, Project, ProjectStatus } from '../types'
 import { formatDate, formatINR } from '../lib/currency'
 import { findCurrentFinancialYear, previewProjectEndDate } from '../lib/financialYear'
+import { previewProjectCode } from '../lib/projectCode'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
 import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
@@ -48,6 +49,7 @@ const emptyForm = {
   budget: '' as number | string,
   category: '',
   location: '',
+  interventionPartner: '',
   startDate: '',
   description: '',
   notes: '',
@@ -91,9 +93,15 @@ export default function Projects() {
       (p) =>
         (!companyFilter || p.companyIds?.includes(companyFilter)) &&
         (!q ||
-          [p.name, p.category, p.location, p.description, companyNames(p.companyIds)].some((f) =>
-            (f ?? '').toLowerCase().includes(q),
-          )),
+          [
+            p.name,
+            p.projectCode,
+            p.category,
+            p.location,
+            p.interventionPartner,
+            p.description,
+            companyNames(p.companyIds),
+          ].some((f) => (f ?? '').toLowerCase().includes(q))),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, companyFilter, search, companies])
@@ -129,6 +137,18 @@ export default function Projects() {
   const fyPreview = useMemo(
     () => findCurrentFinancialYear(years, form.startDate || undefined)?.name ?? '',
     [years, form.startDate],
+  )
+  // Preview of the Project ID the server will issue. An existing project keeps the one
+  // it already has, so renaming it doesn't invalidate the code printed on its
+  // expenditures and receipts.
+  const codePreview = useMemo(
+    () => editing?.projectCode || previewProjectCode(years, form.name, form.startDate),
+    [editing, years, form.name, form.startDate],
+  )
+  // The Schedule VII wording behind the chosen category's short label.
+  const categoryDescription = useMemo(
+    () => categoryOptions.find((c) => c.value === form.category)?.description ?? '',
+    [categoryOptions, form.category],
   )
 
   function setDerivedStatus(derivedStatus: DerivedStatus) {
@@ -244,7 +264,12 @@ export default function Projects() {
                 service={projectDocumentService}
                 queryKey="project-documents"
               />
-              <div className="mb-1 flex items-center gap-2">
+              <div className="mb-1 flex flex-wrap items-center gap-2">
+                {p.projectCode && (
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                    {p.projectCode}
+                  </span>
+                )}
                 <h3 className="font-semibold text-ink">{p.name}</h3>
                 <StatusBadge status={p.status} />
                 <span className="rounded-full bg-ink/5 px-2 py-0.5 text-xs font-medium text-muted">
@@ -255,6 +280,9 @@ export default function Projects() {
                 <span>Companies: <span className="text-ink/80">{companyNames(p.companyIds)}</span></span>
                 <span>FY: <span className="text-ink/80">{fyName(p)}</span></span>
                 {p.category && <span>Category: <span className="text-ink/80">{p.category}</span></span>}
+                {p.interventionPartner && (
+                  <span>Intervention Partner: <span className="text-ink/80">{p.interventionPartner}</span></span>
+                )}
                 {p.location && <span>Location: <span className="text-ink/80">{p.location}</span></span>}
                 <span>Budget: <span className="text-ink/80">{formatINR(p.budget)}</span></span>
                 {(p.startDate || p.endDate) && (
@@ -307,9 +335,19 @@ export default function Projects() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit Project' : 'Add Project'}>
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Project Name">
-            <TextInput required placeholder="Project name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
+            <Field label="Project Name">
+              <TextInput required placeholder="Project name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </Field>
+            <Field label="Project ID (auto)">
+              <TextInput
+                value={codePreview || '—'}
+                readOnly
+                disabled
+                title="First 4 letters of the project name + the start year of its financial year. Issued on save and then fixed for the life of the project."
+              />
+            </Field>
+          </div>
           <div>
             <span className="mb-1.5 block text-sm font-medium text-ink">Companies *</span>
             <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-line bg-surface/60 p-3">
@@ -348,14 +386,31 @@ export default function Projects() {
                 onChange={(e) => setForm({ ...form, budget: e.target.value })}
               />
             </Field>
-            <Field label="Category">
-              <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                <option value="">Select category</option>
-                {categoryOptions.map((c) => <option key={c.id} value={c.value}>{c.value}</option>)}
-                {form.category && !categoryOptions.some((c) => c.value === form.category) && (
-                  <option value={form.category}>{form.category}</option>
-                )}
-              </FormSelect>
+            <div>
+              <Field label="Category">
+                <FormSelect value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  <option value="">Select category</option>
+                  {categoryOptions.map((c) => <option key={c.id} value={c.value}>{c.value}</option>)}
+                  {form.category && !categoryOptions.some((c) => c.value === form.category) && (
+                    <option value={form.category}>{form.category}</option>
+                  )}
+                </FormSelect>
+              </Field>
+              {/* The Schedule VII clause behind the short label, so the legal wording is
+                  visible at the point of choosing. */}
+              {categoryDescription && (
+                <p className="mt-1.5 text-xs leading-relaxed text-muted">{categoryDescription}</p>
+              )}
+            </div>
+            <Field label="Intervention Partner">
+              {/* The implementing agency delivering the project, when it isn't run
+                  directly. Expenditures record whether each spend went Direct or
+                  through this partner. */}
+              <TextInput
+                placeholder="NGO / implementing agency name"
+                value={form.interventionPartner}
+                onChange={(e) => setForm({ ...form, interventionPartner: e.target.value })}
+              />
             </Field>
             <Field label="Location">
               <TextInput placeholder="City, State" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
@@ -418,12 +473,14 @@ export default function Projects() {
         rows={
           viewing
             ? [
+                { label: 'Project ID', value: viewing.projectCode },
                 { label: 'Companies', value: companyNames(viewing.companyIds) },
                 { label: 'Status', value: <StatusBadge status={viewing.status} /> },
                 { label: 'Derived Status', value: viewing.derivedStatus === 'ongoing' ? 'Ongoing' : 'Other than Ongoing' },
                 { label: 'Financial Year', value: fyName(viewing) },
                 { label: 'Budget', value: formatINR(viewing.budget) },
                 { label: 'Category', value: viewing.category },
+                { label: 'Intervention Partner', value: viewing.interventionPartner },
                 { label: 'Location', value: viewing.location },
                 { label: 'Period', value: period(viewing) },
                 { label: 'Created By', value: viewing.createdByName || viewing.createdByEmail },

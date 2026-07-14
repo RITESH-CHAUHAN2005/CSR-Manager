@@ -5,7 +5,7 @@ import userRoutes from './userRoutes.js'
 import logRoutes from './logRoutes.js'
 import { entityRouter } from './entityRouter.js'
 import { blockActiveProjectDelete } from '../middleware/guardProjectDelete.js'
-import { computeProjectDates } from '../middleware/computeProjectDates.js'
+import { computeProjectDerived } from '../middleware/computeProjectDerived.js'
 import { normalizeProjectCompanies } from '../middleware/normalizeProjectCompanies.js'
 import { requireActiveFinancialYear } from '../middleware/requireActiveFinancialYear.js'
 import fundReceiptRoutes from './fundReceiptRoutes.js'
@@ -51,7 +51,7 @@ api.use(
   '/projects',
   entityRouter(Project, projectSchema, 'project', {
     deleteGuards: [blockActiveProjectDelete],
-    preValidate: [normalizeProjectCompanies, computeProjectDates],
+    preValidate: [normalizeProjectCompanies, computeProjectDerived],
     onDeleted: (projectId) => ProjectDocument.deleteMany({ projectId }),
   }),
 )

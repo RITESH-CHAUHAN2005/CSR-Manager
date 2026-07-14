@@ -5,12 +5,26 @@ import { masterDataService } from '../services/dataService'
 import type { MasterDataItem, MasterDataType } from '../types'
 import { getErrorMessage } from '../lib/errors'
 import { useAuth } from '../context/AuthContext'
-import { Card, ConfirmDialog, Field, Modal, PageHeader, PrimaryButton, TextInput } from '../components/ui'
+import {
+  Card,
+  ConfirmDialog,
+  Field,
+  Modal,
+  PageHeader,
+  PrimaryButton,
+  TextArea,
+  TextInput,
+} from '../components/ui'
 
-const TABS: { value: MasterDataType; label: string; hint: string }[] = [
-  { value: 'category', label: 'Category', hint: 'e.g. Education, Environment, Skill Development' },
-  { value: 'status', label: 'Status', hint: 'e.g. Active, Not Active' },
-  { value: 'source', label: 'Source', hint: 'e.g. Interest, SIP, FD' },
+const TABS: { value: MasterDataType; label: string; hint: string; descriptionHint: string }[] = [
+  {
+    value: 'category',
+    label: 'Category',
+    hint: 'The CSR activity heads from Schedule VII of the Companies Act, 2013 — a short label to pick from, with the full clause as its description.',
+    descriptionHint: 'The full Schedule VII clause this category covers',
+  },
+  { value: 'status', label: 'Status', hint: 'e.g. Active, Not Active', descriptionHint: 'What this status means' },
+  { value: 'source', label: 'Source', hint: 'e.g. Interest, SIP, FD', descriptionHint: 'What this source covers' },
 ]
 
 export default function MasterData() {
@@ -22,6 +36,7 @@ export default function MasterData() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<MasterDataItem | null>(null)
   const [value, setValue] = useState('')
+  const [description, setDescription] = useState('')
   const [formError, setFormError] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
@@ -41,12 +56,14 @@ export default function MasterData() {
   function openAdd() {
     setEditing(null)
     setValue('')
+    setDescription('')
     setFormError('')
     setOpen(true)
   }
   function openEdit(item: MasterDataItem) {
     setEditing(item)
     setValue(item.value)
+    setDescription(item.description ?? '')
     setFormError('')
     setOpen(true)
   }
@@ -54,8 +71,11 @@ export default function MasterData() {
     e.preventDefault()
     setFormError('')
     try {
-      if (editing) await updateM.mutateAsync({ id: editing.id, data: { type: editing.type, value } })
-      else await createM.mutateAsync({ type: tab, value })
+      if (editing) {
+        await updateM.mutateAsync({ id: editing.id, data: { type: editing.type, value, description } })
+      } else {
+        await createM.mutateAsync({ type: tab, value, description })
+      }
       setOpen(false)
     } catch (err) {
       setFormError(getErrorMessage(err))
@@ -95,8 +115,13 @@ export default function MasterData() {
         ) : (
           <div className="divide-y divide-line/60">
             {rows.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-4 px-2 py-3">
-                <span className="text-sm font-medium text-ink">{item.value}</span>
+              <div key={item.id} className="flex items-start justify-between gap-4 px-2 py-3">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-ink">{item.value}</span>
+                  {item.description && (
+                    <p className="mt-1 text-xs leading-relaxed text-muted">{item.description}</p>
+                  )}
+                </div>
                 {canWrite && (
                   <div className="flex shrink-0 gap-3">
                     <button onClick={() => openEdit(item)} className="text-muted hover:text-primary" title="Edit">
@@ -116,7 +141,22 @@ export default function MasterData() {
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? `Edit ${activeTab.label}` : `Add ${activeTab.label}`}>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Value">
-            <TextInput required placeholder={activeTab.hint} value={value} onChange={(e) => setValue(e.target.value)} />
+            <TextInput
+              required
+              maxLength={80}
+              placeholder={tab === 'category' ? 'Short label, e.g. Rural Development' : activeTab.hint}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </Field>
+          <Field label="Description">
+            <TextArea
+              rows={5}
+              maxLength={2000}
+              placeholder={activeTab.descriptionHint}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
           </Field>
           {formError && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{formError}</p>}
           <div className="flex justify-end gap-3 pt-2">

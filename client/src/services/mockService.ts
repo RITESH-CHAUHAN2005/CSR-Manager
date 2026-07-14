@@ -1,12 +1,10 @@
-// In-memory data service. Phase 4 swaps these implementations for Axios calls to the
-// Express API — the component-facing interface stays identical.
-//
-// Aggregation rules (reproduce the figures shown in the reference images):
-//   - Dashboard "Total Balance" card = totalReceived - totalExpenditure  (carry-forward excluded:
-//     it is internal movement already counted as received in a prior year).
-//   - Company Fund Position balance    = received + carryForward - expenditure.
-//   - Reports year balance             = (fundsReceived + carryForwardIn) - expenditure;
-//                                        carryForwardOut = balance.
+// In-memory data service used when VITE_USE_API is off. Mirrors the Express API — the
+// component-facing interface is identical, and so are the aggregation rules:
+//   - Dashboard "Total Balance"     = totalReceived - totalExpenditure
+//   - Company Fund Position balance = received - expenditure; Carry Forward is a slice
+//     of that balance (unspent money on Ongoing projects), not an addition to it
+//   - Reports year flow             = each year's closing balance becomes the next
+//     year's Carry Forward In (see lib/carryForward.ts)
 
 import type {
   Company,
@@ -30,6 +28,9 @@ import {
   projects as seedProjects,
 } from '../mocks/seedData'
 import { findCurrentFinancialYear, shiftIsoYears } from '../lib/financialYear'
+import { carryForwardByCompany, carryForwardRows, yearFundFlow } from '../lib/carryForward'
+import { projectCodeBase } from '../lib/projectCode'
+import { SCHEDULE_VII } from '../mocks/scheduleVII'
 
 // Mutable in-memory stores (deep-cloned so we never mutate the seed module).
 const clone = <T,>(arr: T[]): T[] => arr.map((x) => ({ ...x }))
@@ -42,20 +43,21 @@ let expenditures = clone(seedExpenditures)
 let idCounter = 1000
 const nextId = (prefix: string) => `${prefix}${idCounter++}`
 
+// Categories are the statutory Schedule VII activity heads: a short label to pick from,
+// with the full clause as the description.
 let masterDataItems: MasterDataItem[] = [
-  { id: 'md1', type: 'category', value: 'Education' },
-  { id: 'md2', type: 'category', value: 'Environment' },
-  { id: 'md3', type: 'category', value: 'Skill Development' },
-  { id: 'md4', type: 'category', value: 'Healthcare' },
-  { id: 'md5', type: 'status', value: 'Active' },
-  { id: 'md6', type: 'status', value: 'Not Active' },
-  { id: 'md7', type: 'source', value: 'Interest' },
-  { id: 'md8', type: 'source', value: 'SIP' },
-  { id: 'md9', type: 'source', value: 'FD' },
-  { id: 'md10', type: 'category', value: 'Infrastructure' },
-  { id: 'md11', type: 'category', value: 'Women Empowerment' },
-  { id: 'md12', type: 'category', value: 'Rural Development' },
-  { id: 'md13', type: 'source', value: 'Bank Deposit' },
+  ...SCHEDULE_VII.map((c, i) => ({
+    id: `mdc${i + 1}`,
+    type: 'category' as const,
+    value: c.value,
+    description: c.description,
+  })),
+  { id: 'md1', type: 'status', value: 'Active' },
+  { id: 'md2', type: 'status', value: 'Not Active' },
+  { id: 'md3', type: 'source', value: 'Interest' },
+  { id: 'md4', type: 'source', value: 'SIP' },
+  { id: 'md5', type: 'source', value: 'FD' },
+  { id: 'md6', type: 'source', value: 'Bank Deposit' },
 ]
 
 // Documents are held only for the current session (object URLs), since there's no
@@ -109,28 +111,42 @@ export const financialYearService = {
   },
 }
 
-// The server derives endDate + financialYearId from the FY the start date falls
-// into (computeProjectDates middleware). Mirror that here so mock mode matches.
-function deriveProjectDates<T extends Partial<Project>>(data: T): T {
+// The server derives endDate + financialYearId from the FY the start date falls into,
+// and issues the project code (computeProjectDerived middleware). Mirror that here so
+// mock mode matches. An Ongoing project runs 3 years past its start FY; anything else
+// closes with that FY.
+function deriveProjectFields<T extends Partial<Project>>(data: T, existingCode?: string): T {
   const startFy = findCurrentFinancialYear(financialYears, data.startDate || undefined)
-  if (!startFy) return { ...data, financialYearId: undefined }
+  // A code, once issued, is fixed — it is already printed on downstream records.
+  const projectCode = existingCode || nextProjectCode(data.name ?? '', startFy?.startDate ?? data.startDate ?? '')
+  if (!startFy) return { ...data, projectCode, financialYearId: undefined }
   return {
     ...data,
+    projectCode,
     financialYearId: startFy.id,
-    endDate: shiftIsoYears(startFy.endDate, data.derivedStatus === 'ongoing' ? 3 : 1),
+    endDate: data.derivedStatus === 'ongoing' ? shiftIsoYears(startFy.endDate, 3) : startFy.endDate,
   }
+}
+
+function nextProjectCode(name: string, fyStart: string): string {
+  const base = projectCodeBase(name, fyStart)
+  const taken = new Set(projects.map((p) => p.projectCode).filter(Boolean))
+  if (!taken.has(base)) return base
+  let n = 2
+  while (taken.has(`${base}-${n}`)) n += 1
+  return `${base}-${n}`
 }
 
 // ---------------- Projects ----------------
 export const projectService = {
   list: () => delay(clone(projects)),
   create: (data: Omit<Project, 'id'>) => {
-    const project = { ...deriveProjectDates(data), id: nextId('p') }
+    const project = { ...deriveProjectFields(data), id: nextId('p') }
     projects.push(project)
     return delay(project)
   },
   update: (id: string, data: Partial<Project>) => {
-    const patch = deriveProjectDates(data)
+    const patch = deriveProjectFields(data, projects.find((p) => p.id === id)?.projectCode)
     projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
     return delay(projects.find((p) => p.id === id)!)
   },
@@ -191,21 +207,22 @@ export const expenditureService = {
 
 // ---------------- Aggregations ----------------
 function companyPositions(): CompanyFundPosition[] {
+  // Carry Forward is derived — unspent money on this company's Ongoing projects. It is
+  // a slice of the balance, not an addition to it.
+  const carried = carryForwardByCompany(
+    carryForwardRows({ projects, companies, receipts: fundReceipts, expenditures }),
+  )
   return companies.map((c) => {
     const received = sum(fundReceipts.filter((r) => r.companyId === c.id).map((r) => r.amount))
     const myProjects = projects.filter((p) => p.companyIds?.includes(c.id))
-    const myExpenditures = expenditures.filter((e) => e.companyId === c.id)
-    const carryForward =
-      sum(fundReceipts.filter((r) => r.companyId === c.id).map((r) => r.carryForward ?? 0)) +
-      sum(myExpenditures.map((e) => e.carryForwardAmount ?? 0))
-    const expenditure = sum(myExpenditures.map((e) => e.amount))
+    const expenditure = sum(expenditures.filter((e) => e.companyId === c.id).map((e) => e.amount))
     return {
       companyId: c.id,
       companyName: c.name,
       totalReceived: received,
-      carryForward,
+      carryForward: carried.get(c.id) ?? 0,
       expenditure,
-      balance: received + carryForward - expenditure,
+      balance: received - expenditure,
       projects: myProjects.length,
     }
   })
@@ -259,32 +276,8 @@ export const analyticsService = {
     })
   },
 
-  yearWiseReport: (): Promise<YearFundFlow[]> => {
-    const rows = financialYears.map((fy) => {
-      const fundsReceived = sum(
-        fundReceipts.filter((r) => r.financialYearId === fy.id).map((r) => r.amount),
-      )
-      const carryForwardIn = sum(
-        fundReceipts.filter((r) => r.financialYearId === fy.id).map((r) => r.carryForward ?? 0),
-      )
-      const expenditure = sum(
-        expenditures.filter((e) => e.financialYearId === fy.id).map((e) => e.amount),
-      )
-      const totalAvailable = fundsReceived + carryForwardIn
-      const balance = totalAvailable - expenditure
-      return {
-        financialYearId: fy.id,
-        yearName: fy.name,
-        fundsReceived,
-        carryForwardIn,
-        totalAvailable,
-        expenditure,
-        balance,
-        carryForwardOut: balance,
-      }
-    })
-    return delay(rows)
-  },
+  yearWiseReport: (): Promise<YearFundFlow[]> =>
+    delay(yearFundFlow({ years: financialYears, receipts: fundReceipts, expenditures })),
 
   companyPositions: () => delay(companyPositions()),
 

@@ -65,6 +65,7 @@ export interface Company {
   id: string
   name: string
   cin: string // Corporate Identification Number, e.g. U65920MH1994PLC080618
+  pan?: string // Permanent Account Number, e.g. AAACT2727Q
   contactPerson: string
   email: string
   phone: string
@@ -81,18 +82,23 @@ export interface FinancialYear {
 }
 
 export type ProjectStatus = 'active' | 'completed' | 'on_hold' | 'cancelled'
-// Ongoing = still running; end date auto-extends 4 years past the current FY.
-// Other = end date is fixed to the current FY's end date.
+// Ongoing = still running; end date auto-extends 3 years past the start FY.
+// Other than Ongoing = ends within the FY it started in (that FY's end date).
 export type DerivedStatus = 'ongoing' | 'other'
 
 export interface Project extends CreatedBy {
   id: string
   name: string
+  // Business key shown wherever the project is referenced: 4 letters of the name +
+  // the start year of its FY, e.g. RURA2025. Issued server-side and then fixed.
+  projectCode?: string
   // The companies funding this project. What each has actually paid is derived from
   // its Fund Receipts, never stored here.
   companyIds: string[]
-  category: string // Education, Environment, Skill Development, Healthcare...
+  category: string // a Schedule VII activity head, from Master Data
   location: string
+  // The implementing agency delivering the project, when it isn't run directly.
+  interventionPartner?: string
   // Approved cost of the project.
   budget: number
   status: ProjectStatus
@@ -134,6 +140,8 @@ export interface MasterDataItem {
   id: string
   type: MasterDataType
   value: string
+  // What the value covers — carries the full Schedule VII clause for CSR categories.
+  description?: string
 }
 
 // ---- Project document attachments (metadata only — bytes fetched via download URL) ----
@@ -175,21 +183,42 @@ export interface ExpenditureDocumentMeta {
   createdAt?: string
 }
 
+// The statutory CSR expenditure heads.
+export type NatureOfExpense =
+  | 'project_intervention'
+  | 'administrative_overheads'
+  | 'impact_assessment'
+  | 'capital_asset'
+  | 'other'
+
+// Was the money spent by the company itself, or routed through the project's
+// implementing agency (the Intervention Partner named on the Project)?
+export type FundingRoute = 'direct' | 'intervention_partner'
+
+// Only captured when natureOfExpense is 'capital_asset'.
+export interface CapitalAsset {
+  particulars: string
+  address: string
+  district: string
+  state: string
+  pinCode: string
+  dateOfCreation: string
+}
+
 export interface Expenditure extends CreatedBy {
   id: string
-  date: string // ISO yyyy-mm-dd
+  date: string // date of spend, ISO yyyy-mm-dd
   projectId: string
   companyId: string
   financialYearId: string
-  category: string // Infrastructure, Training, Equipment, Scholarships, Environment...
+  natureOfExpense: NatureOfExpense
+  otherNature?: string // required when natureOfExpense is 'other'
+  capitalAsset?: CapitalAsset
+  fundingRoute: FundingRoute
   approvedBy: string // Trustee Board, Executive Director...
   amount: number
-  // Only meaningful when the linked project is Ongoing — unused budget being
-  // carried forward, recorded here rather than on the project itself.
-  carryForwardAmount?: number
   description?: string
   reference?: string
-  notes?: string
 }
 
 // ---- Derived / aggregated shapes (computed, not stored) ----
@@ -202,6 +231,19 @@ export interface CompanyFundPosition {
   expenditure: number
   balance: number
   projects: number
+}
+
+// Unspent money on an Ongoing project, per contributing company. Derived from
+// receipts minus expenditure — see lib/carryForward.ts.
+export interface CarryForwardRow {
+  projectId: string
+  projectCode: string
+  projectName: string
+  companyId: string
+  companyName: string
+  received: number
+  spent: number
+  carryForward: number
 }
 
 export interface YearFundFlow {

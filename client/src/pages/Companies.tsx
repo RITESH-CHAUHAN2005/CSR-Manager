@@ -25,6 +25,7 @@ const dash = (v: unknown, type: string) => (type === 'display' ? (v ? String(v) 
 const empty: Omit<Company, 'id'> = {
   name: '',
   cin: '',
+  pan: '',
   contactPerson: '',
   email: '',
   phone: '',
@@ -49,7 +50,9 @@ export default function Companies() {
     const q = search.trim().toLowerCase()
     if (!q) return companies
     return companies.filter((c) =>
-      [c.name, c.cin, c.contactPerson, c.email].some((f) => (f ?? '').toLowerCase().includes(q)),
+      [c.name, c.cin, c.pan, c.contactPerson, c.email].some((f) =>
+        (f ?? '').toLowerCase().includes(q),
+      ),
     )
   }, [companies, search])
 
@@ -75,6 +78,7 @@ export default function Companies() {
     setForm({
       name: c.name,
       cin: c.cin ?? '',
+      pan: c.pan ?? '',
       contactPerson: c.contactPerson ?? '',
       email: c.email ?? '',
       phone: c.phone ?? '',
@@ -113,6 +117,7 @@ export default function Companies() {
         columns={[
           { data: 'name', title: 'Company Name' },
           { data: 'cin', title: 'CIN', render: dash },
+          { data: 'pan', title: 'PAN', render: dash },
           { data: 'contactPerson', title: 'Contact Person', render: dash },
           { data: 'email', title: 'Email', render: dash },
           { data: 'phone', title: 'Phone', render: dash },
@@ -127,7 +132,7 @@ export default function Companies() {
               {row.name}
             </button>
           ),
-          5: (_v, row) => (
+          6: (_v, row) => (
             <div className="flex justify-end gap-3">
               <button onClick={() => navigate(`/companies/${row.id}`)} className="text-muted hover:text-primary" title="View details">
                 <Eye size={16} />
@@ -163,13 +168,24 @@ export default function Companies() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </Field>
-          <Field label="Registration / CIN Number">
-            <TextInput
-              placeholder="e.g. U72200MH2004PLC153930"
-              value={form.cin}
-              onChange={(e) => setForm({ ...form, cin: e.target.value })}
-            />
-          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Registration / CIN Number">
+              <TextInput
+                placeholder="e.g. U72200MH2004PLC153930"
+                value={form.cin}
+                onChange={(e) => setForm({ ...form, cin: e.target.value })}
+              />
+            </Field>
+            <Field label="PAN">
+              <TextInput
+                placeholder="e.g. AAACT2727Q"
+                maxLength={10}
+                // Stored and compared uppercase, so normalize as it's typed.
+                value={form.pan ?? ''}
+                onChange={(e) => setForm({ ...form, pan: e.target.value.toUpperCase() })}
+              />
+            </Field>
+          </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Contact Person">
               <TextInput

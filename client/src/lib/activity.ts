@@ -1,5 +1,6 @@
-import type { AuditLogEntry } from '../types'
+import type { AuditLogEntry, CapitalAsset, FundingRoute, NatureOfExpense } from '../types'
 import { formatINR } from './currency'
+import { NATURE_LABELS, ROUTE_LABELS } from './expenseLabels'
 
 // Human sentence for a log entry, e.g. "created project 'Clean Water Initiative'".
 export function describeLog(log: AuditLogEntry): string {
@@ -24,6 +25,13 @@ export function describeLog(log: AuditLogEntry): string {
 const FIELD_LABELS: Record<string, string> = {
   name: 'Name',
   cin: 'CIN',
+  pan: 'PAN',
+  projectCode: 'Project ID',
+  interventionPartner: 'Intervention Partner',
+  natureOfExpense: 'Nature of Expense',
+  otherNature: 'Nature of Expense (Other)',
+  capitalAsset: 'Capital Asset',
+  fundingRoute: 'Direct / Through Partner',
   contactPerson: 'Contact Person',
   email: 'Email',
   phone: 'Phone',
@@ -70,6 +78,15 @@ export function fieldLabel(key: string): string {
 export function formatValue(field: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—'
   if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  // Stored enums read as their display labels, not their raw snake_case values.
+  if (field === 'natureOfExpense') return NATURE_LABELS[value as NatureOfExpense] ?? String(value)
+  if (field === 'fundingRoute') return ROUTE_LABELS[value as FundingRoute] ?? String(value)
+  // A capital asset is a nested object — summarize it rather than dumping JSON.
+  if (field === 'capitalAsset' && typeof value === 'object') {
+    const a = value as Partial<CapitalAsset>
+    const parts = [a.particulars, a.district, a.state, a.pinCode].map((x) => x?.trim()).filter(Boolean)
+    return parts.length ? parts.join(', ') : '—'
+  }
   // A project's per-company pledges — summarized, since the raw ids mean nothing here.
   if (field === 'commitments' && Array.isArray(value)) {
     const rows = value as { committedAmount?: number }[]

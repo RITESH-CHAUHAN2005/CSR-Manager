@@ -76,6 +76,7 @@ export default function FundReceipts() {
   const companyName = (id?: string) => (id ? companies.find((c) => c.id === id)?.name ?? '—' : '—')
   const yearName = (id: string) => years.find((y) => y.id === id)?.name ?? '—'
   const projectName = (id?: string) => (id ? projects.find((p) => p.id === id)?.name ?? '—' : '—')
+  const projectCode = (id?: string) => (id ? projects.find((p) => p.id === id)?.projectCode || '—' : '—')
   // What shows in the "Donor Company / Source" column. Every receipt carries a company;
   // an 'other_source' receipt additionally names where the income came from.
   const partyLabel = (r: FundReceipt) => {
@@ -102,7 +103,7 @@ export default function FundReceipts() {
         (!companyFilter || r.companyId === companyFilter) &&
         (!yearFilter || r.financialYearId === yearFilter) &&
         (!q ||
-          [r.reference, partyLabel(r), projectName(r.projectId)].some((f) =>
+          [r.reference, partyLabel(r), projectCode(r.projectId), projectName(r.projectId)].some((f) =>
             (f ?? '').toLowerCase().includes(q),
           )),
     )
@@ -115,6 +116,7 @@ export default function FundReceipts() {
     ...r,
     partyLabel: partyLabel(r),
     yearName: yearName(r.financialYearId),
+    projectCode: projectCode(r.projectId),
     projectName: projectName(r.projectId),
   }))
 
@@ -263,14 +265,16 @@ export default function FundReceipts() {
             { data: 'date', title: 'Date', render: dateCell },
             { data: 'partyLabel', title: 'Donor Company / Source' },
             { data: 'yearName', title: 'Year' },
+            { data: 'projectCode', title: 'Project ID' },
             { data: 'projectName', title: 'Project' },
             { data: 'reference', title: 'Account Number' },
             { data: 'amount', title: 'Amount', className: 'text-right' },
             { data: null, title: '', orderable: false, searchable: false, className: 'text-right' },
           ]}
           slots={{
-            5: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
-            6: (_v, row) => (
+            3: (_v, row) => <span className="font-mono text-xs text-muted">{row.projectCode}</span>,
+            6: (_v, row) => <span className="font-semibold text-success">{formatINR((row as FundReceipt).amount)}</span>,
+            7: (_v, row) => (
               <div className="flex justify-end gap-3">
                 <button onClick={() => setViewing(row as FundReceipt)} className="text-muted hover:text-primary" title="View details & notes"><Eye size={16} /></button>
                 {canWrite && (
@@ -327,7 +331,11 @@ export default function FundReceipts() {
                 onChange={(e) => setForm({ ...form, projectId: e.target.value, rows: {}, refs: {} })}
               >
                 <option value="">No project</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.projectCode ? `${p.projectCode} — ${p.name}` : p.name}
+                  </option>
+                ))}
               </FormSelect>
             </Field>
             {!useGrid && (
@@ -448,6 +456,7 @@ export default function FundReceipts() {
                       ...(viewing.companyId ? [{ label: 'Company', value: companyName(viewing.companyId) }] : []),
                     ]
                   : [{ label: 'Donor Company', value: companyName(viewing.companyId) }]),
+                { label: 'Project ID', value: projectCode(viewing.projectId) },
                 { label: 'Project', value: projectName(viewing.projectId) },
                 { label: 'Account Number', value: viewing.reference },
                 { label: 'Amount', value: <span className="font-semibold text-success">{formatINR(viewing.amount)}</span> },

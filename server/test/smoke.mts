@@ -173,6 +173,108 @@ async function run() {
 
   r = await fetch(`${BASE}/projects/${proj.id}`, { method: 'DELETE', headers: { cookie: adminCookie } })
   check('deleting COMPLETED project allowed -> 200', r.status === 200, `got ${r.status}`)
+
+  // 15. Project ID is issued server-side: 4 letters of the name + the start FY's year.
+  //     A start date of 2024-06-01 falls in FY 2024-25, so "Zenith Uplift" -> ZENI2024.
+  const newProject = (name: string) =>
+    JSON.stringify({
+      name, companyIds: [companies[0].id], derivedStatus: 'other',
+      startDate: '2024-06-01', status: 'completed', budget: 1000,
+      description: 'code test',
+    })
+  r = await fetch(`${BASE}/projects`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: newProject('Zenith Uplift'),
+  })
+  const coded = await r.json()
+  check('project code = ZENI2024', coded.projectCode === 'ZENI2024', `got ${coded.projectCode}`)
+  // Other than Ongoing ends WITH its start FY, not a year later.
+  check('non-ongoing end date = FY end', coded.endDate === '2025-03-31', `got ${coded.endDate}`)
+
+  // A second project whose name starts alike, in the same FY, must not collide.
+  r = await fetch(`${BASE}/projects`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: newProject('Zenith Water'),
+  })
+  const coded2 = await r.json()
+  check('duplicate code suffixed -> ZENI2024-2', coded2.projectCode === 'ZENI2024-2', `got ${coded2.projectCode}`)
+
+  // Seeded "Rural Healthcare Camp" already holds RURA2024, so a new Rural* project in
+  // the same FY has to be handed the next free code rather than clashing with it.
+  r = await fetch(`${BASE}/projects`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: newProject('Rural Uplift'),
+  })
+  const clashing = await r.json()
+  check('code clashing with seed -> RURA2024-2', clashing.projectCode === 'RURA2024-2', `got ${clashing.projectCode}`)
+
+  // Renaming keeps the issued code — it is already printed on downstream records.
+  r = await fetch(`${BASE}/projects/${coded.id}`, {
+    method: 'PUT', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ ...coded, name: 'Completely Different Name' }),
+  })
+  const renamed = await r.json()
+  check('rename keeps project code', renamed.projectCode === 'ZENI2024', `got ${renamed.projectCode}`)
+
+  // 16. PAN is validated when supplied, and optional when not.
+  r = await fetch(`${BASE}/companies`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ name: 'Bad PAN Co', pan: 'NOTAPAN' }),
+  })
+  check('malformed PAN -> 422', r.status === 422, `got ${r.status}`)
+
+  r = await fetch(`${BASE}/companies`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: JSON.stringify({ name: 'Good PAN Co', pan: 'aaact2727q' }),
+  })
+  const panCo = await r.json()
+  check('valid PAN stored uppercase', r.status === 201 && panCo.pan === 'AAACT2727Q', `got ${panCo.pan}`)
+
+  // 17. Carry forward is derived, never entered: money received against an Ongoing
+  //     project minus what has been spent on it. Seed: Women Empowerment (ongoing, TCS)
+  //     received 40,00,000 and has spent 15,50,000.
+  const womenCf = async () => {
+    const res = await fetch(`${BASE}/reports/carry-forward`, { headers: { cookie: adminCookie } })
+    const rows = await res.json()
+    return rows.find((x: { projectCode: string }) => x.projectCode === 'WOME2024')
+  }
+  const before = await womenCf()
+  check('carry forward derived = 24,50,000', before?.carryForward === 2450000, `got ${before?.carryForward}`)
+  check('carry-forward row names its project code', before?.projectCode === 'WOME2024', `got ${before?.projectCode}`)
+
+  // 18. A Capital Asset expenditure must carry the asset's location details.
+  r = await fetch(`${BASE}/projects`, { headers: { cookie: adminCookie } })
+  const allProjects = await r.json()
+  const ongoing = allProjects.find((p: { projectCode: string }) => p.projectCode === 'WOME2024')
+  r = await fetch(`${BASE}/financial-years`, { headers: { cookie: adminCookie } })
+  const fys = await r.json()
+  const activeFy = fys.find((y: { isActive: boolean }) => y.isActive)
+
+  const capitalSpend = (capitalAsset: Record<string, string>) =>
+    JSON.stringify({
+      date: '2024-12-01', projectId: ongoing.id, companyId: ongoing.companyIds[0],
+      financialYearId: activeFy.id, natureOfExpense: 'capital_asset',
+      fundingRoute: 'direct', amount: 50000, capitalAsset,
+    })
+  r = await fetch(`${BASE}/expenditures`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: capitalSpend({ particulars: 'A shed' }),
+  })
+  check('capital asset without location -> 422', r.status === 422, `got ${r.status}`)
+
+  r = await fetch(`${BASE}/expenditures`, {
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: adminCookie },
+    body: capitalSpend({
+      particulars: 'A shed', address: '1 Test Road', district: 'Pune',
+      state: 'Maharashtra', pinCode: '411001', dateOfCreation: '2024-12-01',
+    }),
+  })
+  check('complete capital asset -> 201', r.status === 201, `got ${r.status}`)
+
+  // 19. …and that fresh ₹50,000 spend immediately eats into the carry forward, with no
+  //     one having typed a carry-forward figure anywhere.
+  const after = await womenCf()
+  check('spending drops carry forward to 24,00,000', after?.carryForward === 2400000, `got ${after?.carryForward}`)
 }
 
 try {

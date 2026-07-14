@@ -35,10 +35,21 @@ export const createUserSchema = z.object({
 })
 
 // Only the company name is required. Remaining donor-profile fields are optional
-// (email, when supplied, must still be a valid address).
+// (email and PAN, when supplied, must still be well-formed).
 export const companySchema = z.object({
   name: z.string().min(1).max(200),
   cin: z.string().max(50).optional().default(''),
+  // Indian PAN: 5 letters, 4 digits, 1 letter (e.g. AAACT2727Q). Blank is allowed —
+  // it's optional donor profile data — but a typo'd PAN is not.
+  pan: z
+    .string()
+    .max(10)
+    .optional()
+    .default('')
+    .transform((v) => v.trim().toUpperCase())
+    .refine((v) => v === '' || /^[A-Z]{5}\d{4}[A-Z]$/.test(v), {
+      message: 'PAN must be 10 characters, e.g. AAACT2727Q',
+    }),
   contactPerson: z.string().max(120).optional().default(''),
   email: z.union([z.string().email(), z.literal('')]).optional().default(''),
   phone: z.string().max(40).optional().default(''),
@@ -56,16 +67,21 @@ export const financialYearSchema = z.object({
 export const projectSchema = z
   .object({
     name: z.string().min(1).max(200),
+    // Like endDate/financialYearId, issued by middleware (assignProjectCode) — never
+    // trusted from the client, so a caller can't mint or hijack another project's code.
+    projectCode: z.string().max(40).optional().default(''),
     companyIds: z.array(objectId).min(1, 'Select at least one company'),
     category: z.string().max(80).optional().default(''),
     location: z.string().max(160).optional().default(''),
+    // The implementing agency delivering the project, when it isn't run directly.
+    interventionPartner: z.string().max(200).optional().default(''),
     // The approved cost of the project.
     budget: money.optional().default(0),
     status: z.enum(['active', 'completed', 'on_hold', 'cancelled']).default('active'),
-    // Ongoing = end date auto-extends 4 years past the current FY; Other = end date
-    // is fixed to the current FY's end date. The end date itself is computed by
-    // middleware, not taken from the client. Carry-forward for an Ongoing project is
-    // recorded per-expenditure, not here.
+    // Ongoing = end date auto-extends 3 years past the start FY; Other than Ongoing
+    // ends inside the start FY (that FY's end date). The end date itself is computed
+    // by middleware, not taken from the client. Carry-forward for an Ongoing project
+    // is derived from receipts minus expenditure, never stored.
     derivedStatus: z.enum(['ongoing', 'other']).default('other'),
     description: z.string().max(2000).optional().default(''),
     // Start date is mandatory and can never be in the future.
@@ -140,20 +156,73 @@ export const fundReceiptBulkSchema = z.object({
 export const masterDataItemSchema = z.object({
   type: z.enum(['category', 'status', 'source']),
   value: z.string().min(1).max(80),
+  description: z.string().max(2000).optional().default(''),
 })
 
-export const expenditureSchema = z.object({
-  date: isoDate,
-  projectId: objectId,
-  companyId: objectId,
-  financialYearId: objectId,
-  category: z.string().max(80).optional().default(''),
-  approvedBy: z.string().max(120).optional().default(''),
-  amount: money,
-  // Only meaningful when the linked project is Ongoing — recorded here rather
-  // than on the project itself.
-  carryForwardAmount: money.optional().default(0),
-  description: z.string().max(2000).optional().default(''),
-  reference: z.string().max(120).optional().default(''),
-  notes: z.string().max(2000).optional().default(''),
+const capitalAssetSchema = z.object({
+  particulars: z.string().max(300).optional().default(''),
+  address: z.string().max(400).optional().default(''),
+  district: z.string().max(120).optional().default(''),
+  state: z.string().max(120).optional().default(''),
+  pinCode: z.string().max(10).optional().default(''),
+  dateOfCreation: z.string().max(20).optional().default(''),
 })
+
+// The F.Expense record: which project (by Project ID), which company's money, what
+// kind of spend, how much, when, and whether it was spent directly or routed through
+// the project's Intervention Partner. Carry-forward is NOT recorded here — it is
+// derived from funds received against a project minus what has been spent on it.
+export const expenditureSchema = z
+  .object({
+    date: isoDate,
+    projectId: objectId,
+    companyId: objectId,
+    financialYearId: objectId,
+    natureOfExpense: z
+      .enum([
+        'project_intervention',
+        'administrative_overheads',
+        'impact_assessment',
+        'capital_asset',
+        'other',
+      ])
+      .default('project_intervention'),
+    otherNature: z.string().max(160).optional().default(''),
+    capitalAsset: capitalAssetSchema.optional().default({}),
+    fundingRoute: z.enum(['direct', 'intervention_partner']).default('direct'),
+    approvedBy: z.string().max(120).optional().default(''),
+    amount: money,
+    description: z.string().max(2000).optional().default(''),
+    reference: z.string().max(120).optional().default(''),
+  })
+  // "Any Other" is only meaningful if you say what it is.
+  .refine((d) => d.natureOfExpense !== 'other' || Boolean(d.otherNature?.trim()), {
+    message: 'Specify the nature of the expense',
+    path: ['otherNature'],
+  })
+  // A capital asset has to be identifiable and locatable — that is the whole point of
+  // recording it separately from an ordinary project spend.
+  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.particulars?.trim()), {
+    message: 'Short particulars of the asset are required',
+    path: ['capitalAsset', 'particulars'],
+  })
+  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.address?.trim()), {
+    message: 'Complete address of the asset is required',
+    path: ['capitalAsset', 'address'],
+  })
+  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.district?.trim()), {
+    message: 'District is required',
+    path: ['capitalAsset', 'district'],
+  })
+  .refine((d) => d.natureOfExpense !== 'capital_asset' || Boolean(d.capitalAsset?.state?.trim()), {
+    message: 'State is required',
+    path: ['capitalAsset', 'state'],
+  })
+  .refine((d) => d.natureOfExpense !== 'capital_asset' || /^\d{6}$/.test(d.capitalAsset?.pinCode ?? ''), {
+    message: 'PIN code must be 6 digits',
+    path: ['capitalAsset', 'pinCode'],
+  })
+  .refine(
+    (d) => d.natureOfExpense !== 'capital_asset' || /^\d{4}-\d{2}-\d{2}/.test(d.capitalAsset?.dateOfCreation ?? ''),
+    { message: 'Date of creation is required', path: ['capitalAsset', 'dateOfCreation'] },
+  )

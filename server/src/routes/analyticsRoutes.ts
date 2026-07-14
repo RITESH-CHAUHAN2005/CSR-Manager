@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authenticate } from '../middleware/auth.js'
 import {
+  getCarryForwardReport,
   getCompanyPositions,
   getDashboard,
   getYearWiseReport,
@@ -16,6 +17,7 @@ router.get('/dashboard/summary', getDashboard)
 // Reports data — visible to every role (admin, editor, viewer).
 router.get('/reports/year-wise', getYearWiseReport)
 router.get('/reports/company-positions', getCompanyPositions)
+router.get('/reports/carry-forward', getCarryForwardReport)
 
 // Exports — every signed-in role, same visibility as the report data itself.
 router.get('/reports/export/excel', exportExcel)
