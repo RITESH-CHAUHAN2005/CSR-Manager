@@ -34,6 +34,29 @@ export const createUserSchema = z.object({
   companyId: objectId.optional(),
 })
 
+// Public "forgot password" request — only an email, and we never confirm whether
+// it exists (anti-enumeration is handled in the controller).
+export const forgotPasswordSchema = z.object({ email: z.string().email() })
+
+// Authenticated help-desk request: a subject line and a message body.
+export const createSupportRequestSchema = z.object({
+  subject: z.string().min(1).max(160),
+  message: z.string().min(1).max(2000),
+})
+
+// Admin reply to a support request.
+export const replySupportSchema = z.object({ reply: z.string().min(1).max(2000) })
+
+// Authenticated self-service password change. Same password policy as createUserSchema.
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Za-z]/, 'Password must contain a letter')
+    .regex(/\d/, 'Password must contain a number'),
+})
+
 // Only the company name is required. Remaining donor-profile fields are optional
 // (email and PAN, when supplied, must still be well-formed).
 export const companySchema = z.object({

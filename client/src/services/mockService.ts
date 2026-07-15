@@ -283,8 +283,9 @@ export const analyticsService = {
 
   // Server-rendered PDF/Excel isn't available in standalone mock mode; callers fall back.
   exportReport: (
-    _type: 'year' | 'company' | 'project' | 'carryForward' | 'ledger',
+    _type: import('../types').ExportType,
     _format: 'pdf' | 'excel',
+    _params?: Record<string, string>,
   ): Promise<Blob> =>
     Promise.reject(new Error('Server export unavailable in offline mode')),
 }
@@ -398,14 +399,24 @@ export const expenditureDocumentService = {
     expenditureDocuments.find((d) => d.id === docId)?.url ?? '#',
 }
 
-// --- Mock stubs for admin users + logs (only meaningful with the live API) ---
-import type { AuditLogEntry, ManagedUser, NewUserInput } from '../types'
+// --- Mock stubs for admin users + logs + support (only meaningful with the live API) ---
+import type { AuditLogEntry, ManagedUser, NewUserInput, SupportRequest } from '../types'
 
 export const userAdminService = {
   list: (): Promise<ManagedUser[]> => delay([]),
   create: (data: NewUserInput) =>
     delay({ id: nextId('u'), createdAt: '', ...data } as unknown as ManagedUser),
   remove: (id: string) => delay({ id }),
+}
+
+export const supportService = {
+  create: (_data: { subject: string; message: string }): Promise<SupportRequest> =>
+    Promise.reject(new Error('Support requests require the live backend.')),
+  mine: (): Promise<SupportRequest[]> => delay([]),
+  list: (): Promise<SupportRequest[]> => delay([]),
+  approve: (id: string) => delay({ id, tempPassword: '' }),
+  reject: (id: string) => delay({ id }),
+  reply: (id: string, _reply: string) => delay({ id }),
 }
 
 export const logService = {

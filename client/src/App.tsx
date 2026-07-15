@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { homePathForRole, useAuth } from './context/AuthContext'
 import type { Role } from './types'
 import AppLayout from './components/AppLayout'
+import { ForcePasswordChangeScreen } from './components/ChangePassword'
 
 // Route-based code splitting: each page is emitted as its own hashed chunk under
 // /assets (e.g. Dashboard-XXXX.js) and fetched on demand, instead of one giant
@@ -43,7 +44,7 @@ function RequireRole({ allow, children }: { allow: Role[]; children: JSX.Element
 }
 
 export default function App() {
-  const { isAuthenticated, loading, role } = useAuth()
+  const { isAuthenticated, loading, role, mustChangePassword } = useAuth()
 
   // Wait for session restore (mock: localStorage, API: /auth/me) before routing.
   if (loading) {
@@ -52,6 +53,12 @@ export default function App() {
         Loading…
       </div>
     )
+  }
+
+  // Account on a temporary password (admin just approved a reset): block the whole app
+  // until they set their own password.
+  if (isAuthenticated && mustChangePassword) {
+    return <ForcePasswordChangeScreen />
   }
 
   return (
@@ -100,7 +107,7 @@ export default function App() {
         <Route
           path="/my-dashboard"
           element={
-            <RequireRole allow={['admin', 'editor']}>
+            <RequireRole allow={['editor', 'viewer']}>
               <UserDashboard />
             </RequireRole>
           }

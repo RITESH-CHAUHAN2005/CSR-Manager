@@ -8,7 +8,47 @@ export interface User {
   email: string
   role: Role
   companyId?: string
+  // Set true by the backend after an admin approves a password-reset request (the
+  // account is on a temporary password). The app forces a change before letting the
+  // user in, and clears it once they set their own password.
+  mustChangePassword?: boolean
 }
+
+// A help-desk / support ticket raised by any signed-in user (or the login "forgot
+// password" flow). type 'password' = a password-reset request the admin approves
+// (which resets the account to a temporary password); type 'general' = a free-text
+// problem with a subject the admin replies to.
+export interface SupportRequest {
+  id: string
+  userId: string
+  name: string
+  email: string
+  type: 'password' | 'general'
+  subject: string
+  message: string
+  status: 'pending' | 'approved' | 'rejected' | 'resolved'
+  reply?: string // admin's reply, for a 'general' request
+  resolvedByEmail?: string
+  createdAt: string
+}
+
+// Every server-side export target: the five Report tabs plus the raw per-page tables.
+// Drives GET /reports/export/{pdf|excel}?type=<ExportType>.
+export type ExportType =
+  | 'year'
+  | 'company'
+  | 'project'
+  | 'carryForward'
+  | 'ledger'
+  | 'companies'
+  | 'company-detail' // one company's records (needs a companyId param)
+  | 'projects'
+  | 'fund-receipts'
+  | 'expenditures'
+  | 'financial-years'
+  | 'master-data'
+  | 'users'
+  | 'activity-logs'
 
 // Creator attribution present on operational records (projects/receipts/expenditures).
 export interface CreatedBy {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
+import { ExportButtons } from '../components/ExportButtons'
 import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
 import {
   companyService,
@@ -61,6 +62,7 @@ export default function FundReceipts() {
 
   const [companyFilter, setCompanyFilter] = useState('')
   const [yearFilter, setYearFilter] = useState('')
+  const [sourceFilter, setSourceFilter] = useState('')
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<FundReceipt | null>(null)
@@ -82,7 +84,7 @@ export default function FundReceipts() {
   const partyLabel = (r: FundReceipt) => {
     if (r.receiptType !== 'other_source') return companyName(r.companyId)
     const src = r.source || '—'
-    return r.companyId ? `${src} — ${companyName(r.companyId)}` : src
+    return r.companyId ? `${companyName(r.companyId)} — ${src}` : src
   }
 
   const selectedProject = useMemo(
@@ -102,13 +104,14 @@ export default function FundReceipts() {
       (r) =>
         (!companyFilter || r.companyId === companyFilter) &&
         (!yearFilter || r.financialYearId === yearFilter) &&
+        (!sourceFilter || r.source === sourceFilter) &&
         (!q ||
           [r.reference, partyLabel(r), projectCode(r.projectId), projectName(r.projectId)].some((f) =>
             (f ?? '').toLowerCase().includes(q),
           )),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receipts, companyFilter, yearFilter, search, companies, projects])
+  }, [receipts, companyFilter, yearFilter, sourceFilter, search, companies, projects])
   const total = filtered.reduce((s, r) => s + r.amount, 0)
 
   const dateCell = (d: unknown, type: string) => (type === 'display' ? formatDate(String(d)) : d)
@@ -222,23 +225,40 @@ export default function FundReceipts() {
     }
   }
 
+  const receiptCsv = {
+    filename: 'fund-receipts',
+    headers: ['Date', 'Donor Company / Source', 'Financial Year', 'Project ID', 'Project', 'Account Number', 'Amount'],
+    rows: receipts.map((r) => [
+      r.date,
+      partyLabel(r),
+      yearName(r.financialYearId),
+      projectCode(r.projectId),
+      projectName(r.projectId),
+      r.reference || '—',
+      r.amount,
+    ]) as (string | number)[][],
+  }
+
   return (
     <>
       <PageHeader
         title="Fund Receipts"
         subtitle={`${filtered.length} records — Total: ${formatINR(total)}`}
         action={
-          canCreate && (
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => openAdd('other_source')}
-                className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-ink/5"
-              >
-                Receipt From Other Source
-              </button>
-              <PrimaryButton onClick={() => openAdd('company')}>Record Receipt</PrimaryButton>
-            </div>
-          )
+          <div className="flex flex-wrap gap-3">
+            <ExportButtons entity="fund-receipts" csv={receiptCsv} />
+            {canCreate && (
+              <>
+                <button
+                  onClick={() => openAdd('other_source')}
+                  className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface/70 px-4 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-ink/5"
+                >
+                  Receipt From Other Source
+                </button>
+                <PrimaryButton onClick={() => openAdd('company')}>Record Receipt</PrimaryButton>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -254,6 +274,10 @@ export default function FundReceipts() {
         <Select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
           <option value="">All Years</option>
           {years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+        </Select>
+        <Select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+          <option value="">All Sources</option>
+          {sourceOptions.map((s) => <option key={s.id} value={s.value}>{s.value}</option>)}
         </Select>
         <SearchInput value={search} onChange={setSearch} placeholder="Search receipts…" />
       </div>

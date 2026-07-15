@@ -23,6 +23,7 @@ import {
   TextInput,
 } from '../components/ui'
 import { DataTable, type DTColumn } from '../components/DataTable'
+import { ExportButtons } from '../components/ExportButtons'
 
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0)
 const money = (d: unknown, type: string) => (type === 'display' ? formatINR(Number(d)) : Number(d))
@@ -95,6 +96,12 @@ export default function CompanyDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [myReceipts, years],
   )
+
+  const companyCsv = {
+    filename: `company-${company?.name ?? id}`,
+    headers: ['Date', 'Source', 'Financial Year', 'Account Number', 'Amount'],
+    rows: receiptRows.map((r) => [r.date, r.source || '—', r.yearLabel, r.reference || '—', r.amount]) as (string | number)[][],
+  }
 
   const projectRows = useMemo(
     () =>
@@ -186,14 +193,17 @@ export default function CompanyDetail() {
             </div>
           </div>
         </div>
-        {canWrite && (
-          <button
-            onClick={openEdit}
-            className="inline-flex items-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5"
-          >
-            <Pencil size={15} /> Edit
-          </button>
-        )}
+        <div className="flex flex-wrap gap-3">
+          <ExportButtons entity="company-detail" params={{ companyId: id }} csv={companyCsv} />
+          {canWrite && (
+            <button
+              onClick={openEdit}
+              className="inline-flex items-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-ink/5"
+            >
+              <Pencil size={15} /> Edit
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Contact + Fund overview + Year-wise summary + Projects + Fund receipts —
@@ -203,6 +213,12 @@ export default function CompanyDetail() {
           <div className="p-6">
             <h2 className="mb-4 text-lg font-semibold text-ink">Contact Information</h2>
             <div className="space-y-3 text-sm text-ink/80">
+              {company.cin && (
+                <p className="flex items-center gap-3"><span className="w-16 shrink-0 text-xs uppercase tracking-wide text-muted">CIN</span> <span className="font-medium text-ink">{company.cin}</span></p>
+              )}
+              {company.pan && (
+                <p className="flex items-center gap-3"><span className="w-16 shrink-0 text-xs uppercase tracking-wide text-muted">PAN</span> <span className="font-medium text-ink">{company.pan}</span></p>
+              )}
               {company.contactPerson && (
                 <p className="flex items-center gap-3"><User size={16} className="text-muted" /> {company.contactPerson}</p>
               )}
@@ -329,11 +345,12 @@ export default function CompanyDetail() {
               columns={[
                 { data: 'date', title: 'Date', render: dateCell },
                 { data: 'yearLabel', title: 'Year' },
+                { data: 'source', title: 'Source', render: dash },
                 { data: 'reference', title: 'Account Number' },
                 { data: 'amount', title: 'Amount', className: 'text-right' },
               ] as DTColumn[]}
               slots={{
-                3: (_cell, row) => (
+                4: (_cell, row) => (
                   <span className="font-semibold text-success">{formatINR(row.amount)}</span>
                 ),
               }}

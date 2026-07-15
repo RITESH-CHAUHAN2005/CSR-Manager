@@ -12,8 +12,12 @@ interface AuthState {
   canWrite: boolean // admin + editor: create / update / delete
   canCreate: boolean // alias of canWrite (kept for existing page code)
   canSeeDashboard: boolean // admin + viewer (editors do not see the Dashboard)
+  mustChangePassword: boolean // account is on a temporary password — force a change
   login: (email: string, password: string) => Promise<User>
   logout: () => void
+  // Re-fetch the signed-in user (e.g. after a self-service password change clears the
+  // mustChangePassword flag) so the UI reflects the latest server state.
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
@@ -41,6 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  async function refresh() {
+    const u = await authService.me()
+    setUser(u)
+  }
+
   const value = useMemo<AuthState>(() => {
     const role = user?.role ?? null
     const isAdmin = role === 'admin'
@@ -56,8 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canWrite,
       canCreate: canWrite,
       canSeeDashboard: !!role, // every signed-in role can see the Dashboard
+      mustChangePassword: !!user?.mustChangePassword,
       login,
       logout,
+      refresh,
     }
   }, [user, loading])
 

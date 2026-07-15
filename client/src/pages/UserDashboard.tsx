@@ -1,16 +1,29 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Briefcase, FileText, Receipt, UserCircle } from '../components/icons'
 import {
   expenditureService,
   fundReceiptService,
   logService,
   projectService,
+  supportService,
 } from '../services/dataService'
 import { useAuth } from '../context/AuthContext'
-import { Card, PageHeader } from '../components/ui'
+import {
+  Card,
+  Field,
+  PageHeader,
+  PrimaryButton,
+  StatusBadge,
+  TextArea,
+  TextInput,
+} from '../components/ui'
+import { ChangePasswordForm } from '../components/ChangePassword'
 import { DataTable, type DTColumn } from '../components/DataTable'
 import { formatDate, formatINR } from '../lib/currency'
 import { describeLog, formatTimestamp } from '../lib/activity'
+import { getErrorMessage } from '../lib/errors'
+import type { SupportRequest } from '../types'
 
 export default function UserDashboard() {
   const { user } = useAuth()
@@ -24,6 +37,31 @@ export default function UserDashboard() {
   const myProjects = projects.filter((p) => mine(p.createdById))
   const myReceipts = receipts.filter((r) => mine(r.createdById))
   const myExpenditures = expenditures.filter((e) => mine(e.createdById))
+
+  // Help desk — raise a request to the admin and read their replies.
+  const qc = useQueryClient()
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [reqErr, setReqErr] = useState('')
+  const [reqOk, setReqOk] = useState('')
+
+  const { data: myRequests = [] } = useQuery({
+    queryKey: ['my-support-requests'],
+    queryFn: supportService.mine,
+  })
+
+  const createReq = useMutation({
+    mutationFn: () => supportService.create({ subject, message }),
+    onSuccess: () => {
+      setSubject('')
+      setMessage('')
+      setReqOk('Request sent to your administrator ✓')
+      setReqErr('')
+      setTimeout(() => setReqOk(''), 3000)
+      qc.invalidateQueries({ queryKey: ['my-support-requests'] })
+    },
+    onError: (err) => setReqErr(getErrorMessage(err, 'Could not send request')),
+  })
 
   return (
     <>
@@ -45,6 +83,72 @@ export default function UserDashboard() {
           </span>
         </div>
       </Card>
+
+      {/* Change Password */}
+      <Card className="mb-6 p-5">
+        <h2 className="mb-4 font-semibold text-ink">Change Password</h2>
+        <ChangePasswordForm />
+      </Card>
+
+      {/* Help desk — raise a request + read admin replies */}
+      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        {/* Raise a Request */}
+        <Card className="p-5">
+          <h2 className="mb-1 font-semibold text-ink">Raise a Request</h2>
+          <p className="mb-4 text-sm text-muted">
+            Send a message to your administrator. They will reply, and the reply appears in
+            “My Requests” below.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!subject.trim() || !message.trim()) {
+                setReqErr('Add a subject and a message.')
+                return
+              }
+              createReq.mutate()
+            }}
+            className="space-y-4"
+          >
+            <Field label="Subject">
+              <TextInput
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Brief summary of your request"
+              />
+            </Field>
+            <Field label="Message">
+              <TextArea
+                rows={3}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Describe what you need help with"
+              />
+            </Field>
+            {reqErr && <p className="text-sm font-medium text-danger">{reqErr}</p>}
+            {reqOk && <p className="text-sm font-medium text-success">{reqOk}</p>}
+            <PrimaryButton type="submit" icon={false} disabled={createReq.isPending}>
+              {createReq.isPending ? 'Sending…' : 'Send Request'}
+            </PrimaryButton>
+          </form>
+        </Card>
+
+        {/* My Requests */}
+        <Card className="p-5">
+          <h2 className="mb-4 font-semibold text-ink">My Requests</h2>
+          {myRequests.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted">
+              You haven't raised any requests yet.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {myRequests.map((r) => (
+                <RequestRow key={r.id} request={r} />
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* My counts */}
       <div className="mb-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -108,6 +212,36 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
       </div>
       <p className="mt-2 text-2xl font-bold text-ink">{value}</p>
     </Card>
+  )
+}
+
+function RequestRow({ request: r }: { request: SupportRequest }) {
+  const isPassword = r.type === 'password'
+  return (
+    <div className="rounded-lg border border-line/60 p-3.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              isPassword ? 'bg-warning/15 text-warning' : 'bg-accent/10 text-accent-dark'
+            }`}
+          >
+            {isPassword ? 'Password' : 'General'}
+          </span>
+          <span className="font-medium text-ink">{r.subject}</span>
+        </div>
+        <StatusBadge status={r.status} />
+      </div>
+      <p className="text-sm text-ink/80">{r.message}</p>
+      {r.reply && (
+        <div className="mt-2.5 rounded-md bg-primary/5 px-3 py-2">
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-primary">
+            Admin reply:
+          </p>
+          <p className="text-sm text-ink/80">{r.reply}</p>
+        </div>
+      )}
+    </div>
   )
 }
 

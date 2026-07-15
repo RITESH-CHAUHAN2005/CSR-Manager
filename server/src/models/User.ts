@@ -16,6 +16,7 @@ export interface IUser extends Document {
   passwordHash: string
   role: Role
   companyId?: mongoose.Types.ObjectId
+  mustChangePassword: boolean
   loginAttempts: number
   lockUntil?: number
   isLocked(): boolean
@@ -41,6 +42,9 @@ const userSchema = new Schema<IUser>(
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: ['admin', 'editor', 'viewer'], default: 'viewer' },
     companyId: { type: Schema.Types.ObjectId, ref: 'Company' },
+    // When true, the client forces the user through a password change before
+    // they can use the app (set after an admin-approved password reset).
+    mustChangePassword: { type: Boolean, default: false },
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Number },
   },

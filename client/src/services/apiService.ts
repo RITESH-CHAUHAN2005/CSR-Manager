@@ -11,11 +11,13 @@ import type {
   FinancialYear,
   FundReceipt,
   FundReceiptDocumentMeta,
+  ExportType,
   ManagedUser,
   MasterDataItem,
   NewUserInput,
   Project,
   ProjectDocumentMeta,
+  SupportRequest,
   YearFundFlow,
 } from '../types'
 
@@ -112,13 +114,16 @@ export const analyticsService = {
   yearWiseReport: () => api.get<YearFundFlow[]>('/reports/year-wise').then((r) => r.data),
   companyPositions: () =>
     api.get<CompanyFundPosition[]>('/reports/company-positions').then((r) => r.data),
-  // Streams a proper server-generated PDF/Excel of the chosen report as a Blob.
+  // Streams a proper server-generated PDF/Excel of the chosen report OR raw per-page
+  // table (companies, projects, fund-receipts, …) as a Blob. `params` carries extra
+  // query args like { companyId } for a company-detail export.
   exportReport: (
-    type: 'year' | 'company' | 'project' | 'carryForward' | 'ledger',
+    type: ExportType,
     format: 'pdf' | 'excel',
+    params?: Record<string, string>,
   ): Promise<Blob> =>
     api
-      .get(`/reports/export/${format}`, { params: { type }, responseType: 'blob' })
+      .get(`/reports/export/${format}`, { params: { type, ...params }, responseType: 'blob' })
       .then((r) => r.data as Blob),
 }
 
@@ -126,6 +131,29 @@ export const userAdminService = {
   list: () => api.get<ManagedUser[]>('/users').then((r) => r.data),
   create: (data: NewUserInput) => api.post<ManagedUser>('/users', data).then((r) => r.data),
   remove: (id: string) => api.delete<{ id: string }>(`/users/${id}`).then((r) => r.data),
+}
+
+// Help-desk / support tickets. Any signed-in user can raise one and see their own;
+// admins review the open queue and approve/reject (password) or reply (general).
+export const supportService = {
+  // Raise a general (non-password) request.
+  create: (data: { subject: string; message: string }) =>
+    api.post<SupportRequest>('/support-requests', data).then((r) => r.data),
+  // The caller's own requests (to read admin replies / status).
+  mine: () => api.get<SupportRequest[]>('/support-requests/mine').then((r) => r.data),
+  // Admin: the open queue.
+  list: () => api.get<SupportRequest[]>('/support-requests').then((r) => r.data),
+  // Admin: approve a password request → resets to the default password, returned so the
+  // admin can relay it.
+  approve: (id: string) =>
+    api
+      .post<{ id: string; tempPassword: string }>(`/support-requests/${id}/approve`)
+      .then((r) => r.data),
+  reject: (id: string) =>
+    api.post<{ id: string }>(`/support-requests/${id}/reject`).then((r) => r.data),
+  // Admin: reply to a general request (marks it resolved).
+  reply: (id: string, reply: string) =>
+    api.post<{ id: string }>(`/support-requests/${id}/reply`, { reply }).then((r) => r.data),
 }
 
 export const logService = {

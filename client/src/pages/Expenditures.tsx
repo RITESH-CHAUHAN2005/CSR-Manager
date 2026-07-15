@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
+import { ExportButtons } from '../components/ExportButtons'
 import { DocumentAttachments, StagedAttachments } from '../components/DocumentAttachments'
 import {
   companyService,
@@ -222,12 +223,32 @@ export default function Expenditures() {
     }
   }
 
+  const expenditureCsv = {
+    filename: 'expenditures',
+    headers: ['Date', 'Project ID', 'Project', 'Company', 'Financial Year', 'Approved By', 'Reference', 'Amount'],
+    rows: expenditures.map((e) => [
+      e.date,
+      projectCode(e.projectId),
+      projectName(e.projectId),
+      companyName(e.companyId),
+      yearName(e.financialYearId),
+      e.approvedBy || '—',
+      e.reference || '—',
+      e.amount,
+    ]) as (string | number)[][],
+  }
+
   return (
     <>
       <PageHeader
         title="Expenditures"
         subtitle={`${filtered.length} records — Total: ${formatINR(total)}`}
-        action={canCreate && <PrimaryButton onClick={openAdd}>Record Expenditure</PrimaryButton>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <ExportButtons entity="expenditures" csv={expenditureCsv} />
+            {canCreate && <PrimaryButton onClick={openAdd}>Record Expenditure</PrimaryButton>}
+          </div>
+        }
       />
 
       {docUploadWarning && (

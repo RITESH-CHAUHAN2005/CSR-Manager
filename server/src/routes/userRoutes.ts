@@ -11,6 +11,7 @@ router.use(authenticate, requireAdmin)
 
 router.get('/', listUsers)
 router.post('/', validateBody(createUserSchema), createUser)
+
 router.delete('/:id', deleteUser)
 
 export default router

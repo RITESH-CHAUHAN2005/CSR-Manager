@@ -13,6 +13,11 @@ interface AuthService {
   login(email: string, password: string): Promise<User>
   logout(): Promise<void>
   me(): Promise<User | null>
+  // Raise a password-reset request (only the email is needed). The response is always
+  // generic — it never reveals whether the account exists.
+  forgotPassword(email: string): Promise<void>
+  // Self-service password change for a signed-in user.
+  changePassword(currentPassword: string, newPassword: string): Promise<void>
 }
 
 const mockAuth: AuthService = {
@@ -35,6 +40,13 @@ const mockAuth: AuthService = {
     } catch {
       return null
     }
+  },
+  // No backend in mock mode — these are meaningful only against the live API.
+  async forgotPassword() {
+    /* no-op: request is recorded only by the real backend */
+  },
+  async changePassword() {
+    throw new Error('Password change requires the live backend.')
   },
 }
 
@@ -62,6 +74,12 @@ const apiAuth: AuthService = {
     } catch {
       return null
     }
+  },
+  async forgotPassword(email) {
+    await api.post('/auth/forgot-password', { email: email.trim().toLowerCase() })
+  },
+  async changePassword(currentPassword, newPassword) {
+    await api.post('/auth/change-password', { currentPassword, newPassword })
   },
 }
 

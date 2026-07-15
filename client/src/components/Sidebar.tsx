@@ -186,7 +186,7 @@ export default function Sidebar({
 
           {canWrite && <NavItem {...MASTER_DATA} onClick={onClose} />}
           {role === 'admin' && <NavItem {...ADMIN_PANEL} onClick={onClose} />}
-          {role === 'editor' && <NavItem {...MY_DASHBOARD} onClick={onClose} />}
+          {(role === 'editor' || role === 'viewer') && <NavItem {...MY_DASHBOARD} onClick={onClose} />}
         </nav>
 
         {/* User / logout */}

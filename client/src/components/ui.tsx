@@ -100,6 +100,7 @@ export function StatusBadge({ status }: { status: string }) {
     approved: 'bg-success/15 text-success ring-success/20',
     pending: 'bg-warning/15 text-warning ring-warning/25',
     rejected: 'bg-danger/15 text-danger ring-danger/20',
+    resolved: 'bg-primary/15 text-primary ring-primary/20',
   }
   return (
     <span

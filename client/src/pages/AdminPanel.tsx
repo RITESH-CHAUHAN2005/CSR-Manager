@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Search, Share, Trash2, UsersThree } from '../components/icons'
-import { logService, userAdminService } from '../services/dataService'
+import { logService, supportService, userAdminService } from '../services/dataService'
 import { DataTable, type DTColumn } from '../components/DataTable'
+import { ExportButtons } from '../components/ExportButtons'
 import type { AuditLogEntry, ManagedUser, NewUserInput } from '../types'
 import {
   Card,
@@ -13,8 +14,10 @@ import {
   PageHeader,
   PrimaryButton,
   Select,
+  TextArea,
   TextInput,
 } from '../components/ui'
+import { ChangePasswordForm } from '../components/ChangePassword'
 import { getErrorMessage } from '../lib/errors'
 import { describeLog, formatTimestamp, logDetails, shareLog } from '../lib/activity'
 import { useAuth } from '../context/AuthContext'
@@ -49,6 +52,11 @@ export default function AdminPanel() {
   const [formError, setFormError] = useState('')
   const [formOk, setFormOk] = useState('')
   const [deleteError, setDeleteError] = useState('')
+  // After approving a reset, hold the generated temp password so the admin can relay it.
+  const [resetInfo, setResetInfo] = useState<{ email: string; tempPassword: string } | null>(null)
+  const [resetError, setResetError] = useState('')
+  const [replyText, setReplyText] = useState<Record<string, string>>({})
+  const [replyOk, setReplyOk] = useState('')
 
   const { data: logs = [] } = useQuery({
     queryKey: ['logs', actionFilter, userFilter],
@@ -59,10 +67,44 @@ export default function AdminPanel() {
       }),
   })
 
+  const { data: requests = [] } = useQuery({
+    queryKey: ['support-requests'],
+    queryFn: supportService.list,
+  })
+
   const invalidateUsers = () => {
     qc.invalidateQueries({ queryKey: ['users'] })
     qc.invalidateQueries({ queryKey: ['logs'] })
   }
+  const invalidateRequests = () => {
+    qc.invalidateQueries({ queryKey: ['support-requests'] })
+    qc.invalidateQueries({ queryKey: ['logs'] })
+  }
+  const approveM = useMutation({
+    mutationFn: supportService.approve,
+    onSuccess: (res, id) => {
+      const r = requests.find((x) => x.id === id)
+      setResetInfo({ email: r?.email ?? '', tempPassword: res.tempPassword })
+      setResetError('')
+      invalidateRequests()
+    },
+    onError: (err) => setResetError(getErrorMessage(err, 'Could not approve request')),
+  })
+  const rejectM = useMutation({
+    mutationFn: supportService.reject,
+    onSuccess: invalidateRequests,
+    onError: (err) => setResetError(getErrorMessage(err, 'Could not reject request')),
+  })
+  const replyM = useMutation({
+    mutationFn: ({ id, reply }: { id: string; reply: string }) => supportService.reply(id, reply),
+    onSuccess: (_res, v) => {
+      setReplyText((d) => ({ ...d, [v.id]: '' }))
+      setReplyOk('Reply sent ✓')
+      setTimeout(() => setReplyOk(''), 2500)
+      invalidateRequests()
+    },
+    onError: (err) => setResetError(getErrorMessage(err, 'Could not send reply')),
+  })
   const createM = useMutation({ mutationFn: userAdminService.create, onSuccess: invalidateUsers })
   const deleteM = useMutation({
     mutationFn: userAdminService.remove,
@@ -83,6 +125,11 @@ export default function AdminPanel() {
   const viewerCount = users.filter((u) => u.role === 'viewer').length
 
   const userRows = users.map((u) => ({ ...u, companyLabel: companyName(u.companyId) }))
+  const usersCsv = {
+    filename: 'users',
+    headers: ['Name', 'Email', 'Role', 'Company'],
+    rows: users.map((u) => [u.name, u.email, u.role, companyName(u.companyId)]) as (string | number)[][],
+  }
   const userColumns: DTColumn[] = [
     { data: 'name', title: 'Name' },
     { data: 'email', title: 'Email' },
@@ -98,6 +145,12 @@ export default function AdminPanel() {
       (l) => l.userEmail.toLowerCase().includes(q) || describeLog(l).toLowerCase().includes(q),
     )
   }, [logs, search])
+
+  const logsCsv = {
+    filename: 'activity-logs',
+    headers: ['When', 'User', 'Role', 'Activity'],
+    rows: filteredLogs.map((l) => [formatTimestamp(l.createdAt), l.userEmail, l.userRole ?? '—', describeLog(l)]) as (string | number)[][],
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -185,11 +238,141 @@ export default function AdminPanel() {
         </form>
       </Card>
 
+      {/* Change password */}
+      <Card className="mb-6 p-5">
+        <h2 className="mb-4 font-semibold text-ink">Change Password</h2>
+        <ChangePasswordForm inline />
+      </Card>
+
+      {/* Help desk requests */}
+      <Card className="mb-6 p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-ink">
+            Help Desk Requests
+            {requests.length > 0 && (
+              <span className="ml-2 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                {requests.length} pending
+              </span>
+            )}
+          </h2>
+          <div className="flex items-center gap-3">
+            {replyOk && <span className="text-sm text-success">{replyOk}</span>}
+            {resetError && <span className="text-sm text-danger">{resetError}</span>}
+          </div>
+        </div>
+
+        {resetInfo && (
+          <div className="mb-4 rounded-xl bg-success/10 px-4 py-3 text-sm text-success">
+            Password for <span className="font-semibold">{resetInfo.email}</span> has been reset to{' '}
+            <span className="font-mono font-semibold">{resetInfo.tempPassword}</span>. Share it with the
+            user — they'll be asked to set their own password on next sign in.
+            <button
+              onClick={() => setResetInfo(null)}
+              className="ml-3 font-medium underline hover:no-underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {requests.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted">No pending requests.</p>
+        ) : (
+          <ul className="divide-y divide-line/60">
+            {requests.map((r) => (
+              <li key={r.id} className="py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                          r.type === 'password'
+                            ? 'bg-warning/15 text-warning'
+                            : 'bg-accent/10 text-accent-dark'
+                        }`}
+                      >
+                        {r.type === 'password' ? 'Password' : 'General'}
+                      </span>
+                      <p className="truncate text-sm font-medium text-ink">{r.subject}</p>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted">
+                      {r.name} · {r.email} · requested {formatTimestamp(r.createdAt)}
+                    </p>
+                  </div>
+                  {r.type === 'password' && (
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => { setResetError(''); approveM.mutate(r.id) }}
+                        disabled={approveM.isPending || rejectM.isPending}
+                        className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+                      >
+                        Approve &amp; Reset
+                      </button>
+                      <button
+                        onClick={() => { setResetError(''); rejectM.mutate(r.id) }}
+                        disabled={approveM.isPending || rejectM.isPending}
+                        className="rounded-lg border border-line bg-surface/70 px-3 py-1.5 text-sm font-medium text-danger hover:bg-ink/5 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {r.type === 'general' && (
+                  <div className="mt-2">
+                    <p className="whitespace-pre-wrap rounded-lg bg-ink/[0.03] px-3 py-2 text-sm text-ink/80">
+                      {r.message}
+                    </p>
+                    <div className="mt-2">
+                      <TextArea
+                        rows={2}
+                        value={replyText[r.id] ?? ''}
+                        onChange={(e) =>
+                          setReplyText((d) => ({ ...d, [r.id]: e.target.value }))
+                        }
+                        placeholder="Type a reply…"
+                      />
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => {
+                            setResetError('')
+                            replyM.mutate({ id: r.id, reply: replyText[r.id] || '' })
+                          }}
+                          disabled={
+                            !(replyText[r.id] || '').trim() ||
+                            replyM.isPending ||
+                            rejectM.isPending
+                          }
+                          className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+                        >
+                          Send Reply
+                        </button>
+                        <button
+                          onClick={() => { setResetError(''); rejectM.mutate(r.id) }}
+                          disabled={replyM.isPending || rejectM.isPending}
+                          className="rounded-lg border border-line bg-surface/70 px-3 py-1.5 text-sm font-medium text-danger hover:bg-ink/5 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
       {/* All users */}
       <Card className="mb-6 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-5">
           <h2 className="font-semibold text-ink">All Users</h2>
-          {deleteError && <span className="text-sm text-danger">{deleteError}</span>}
+          <div className="flex flex-wrap items-center gap-3">
+            {deleteError && <span className="text-sm text-danger">{deleteError}</span>}
+            <ExportButtons entity="users" csv={usersCsv} />
+          </div>
         </div>
         <div className="p-2 sm:p-4">
           <DataTable
@@ -229,6 +412,7 @@ export default function AdminPanel() {
           <h2 className="font-semibold text-ink">Activity Logs</h2>
           <div className="flex items-center gap-3">
             {shareNote && <span className="text-sm font-medium text-success">{shareNote}</span>}
+            <ExportButtons entity="activity-logs" csv={logsCsv} />
             {logs.length > 0 && (
               <button
                 onClick={() => setClearOpen(true)}

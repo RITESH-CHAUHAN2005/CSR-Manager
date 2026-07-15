@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { User } from '../models/User.js'
 import { AuditLog } from '../models/AuditLog.js'
+import { SupportRequest } from '../models/SupportRequest.js'
 import { clearAuthCookie, setAuthCookie, signToken } from '../utils/token.js'
 
 // A real bcrypt hash compared against when the email doesn't exist, so the response
@@ -77,6 +78,83 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
 export const logout = asyncHandler(async (_req: Request, res: Response) => {
   clearAuthCookie(res)
+  res.json({ ok: true })
+})
+
+// PUBLIC. A user asks for a password reset. We ALWAYS return the same generic
+// { ok: true } regardless of whether the email exists — never reveal account
+// existence (anti-enumeration). When the email does belong to a user and no
+// pending request already exists, we queue one for an admin to review.
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  const { email } = req.body as { email: string }
+  const normalized = email.toLowerCase()
+
+  const user = await User.findOne({ email: normalized })
+  if (user) {
+    const existing = await SupportRequest.findOne({
+      userId: user._id,
+      type: 'password',
+      status: 'pending',
+    })
+    if (!existing) {
+      await SupportRequest.create({
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        type: 'password',
+        subject: 'Password reset',
+        message: '',
+        status: 'pending',
+      })
+      AuditLog.create({
+        userId: user._id,
+        userEmail: user.email,
+        action: 'password_reset_requested',
+        entity: 'auth',
+        method: 'POST',
+        path: '/api/auth/forgot-password',
+        ip: req.ip,
+        statusCode: 200,
+      }).catch(() => {})
+    }
+  }
+
+  // Identical response in every case (found / not found / duplicate).
+  res.json({ ok: true })
+})
+
+// AUTHENTICATED. The signed-in user changes their own password. Requires the
+// current password to be re-verified, and clears the mustChangePassword flag so
+// a forced-reset user is released once they've set a new password.
+export const changePassword = asyncHandler(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword: string
+    newPassword: string
+  }
+
+  const user = await User.findById(req.user!.id).select('+passwordHash')
+  if (!user) throw new ApiError(401, 'Session is no longer valid')
+
+  const ok = await user.comparePassword(currentPassword)
+  if (!ok) throw new ApiError(400, 'Current password is incorrect')
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12)
+  user.mustChangePassword = false
+  await user.save()
+
+  AuditLog.create({
+    userId: user._id,
+    userEmail: user.email,
+    userRole: user.role,
+    action: 'password_changed',
+    entity: 'user',
+    entityId: String(user._id),
+    method: 'POST',
+    path: '/api/auth/change-password',
+    ip: req.ip,
+    statusCode: 200,
+  }).catch(() => {})
+
   res.json({ ok: true })
 })
 

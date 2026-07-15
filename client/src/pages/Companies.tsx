@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
 import { DataTable } from '../components/DataTable'
+import { ExportButtons } from '../components/ExportButtons'
 import { companyService } from '../services/dataService'
 import type { Company } from '../types'
 import { getErrorMessage } from '../lib/errors'
@@ -100,12 +101,31 @@ export default function Companies() {
     }
   }
 
+  const companyCsv = {
+    filename: 'companies',
+    headers: ['Name', 'CIN', 'PAN', 'Contact Person', 'Email', 'Phone', 'Address'],
+    rows: companies.map((c) => [
+      c.name,
+      c.cin || '—',
+      c.pan || '—',
+      c.contactPerson || '—',
+      c.email || '—',
+      c.phone || '—',
+      c.address || '—',
+    ]) as (string | number)[][],
+  }
+
   return (
     <>
       <PageHeader
         title="Donor Companies"
         subtitle={`${filtered.length} ${filtered.length === 1 ? 'company' : 'companies'}`}
-        action={canWrite && <PrimaryButton onClick={openAdd}>Add Company</PrimaryButton>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <ExportButtons entity="companies" csv={companyCsv} />
+            {canWrite && <PrimaryButton onClick={openAdd}>Add Company</PrimaryButton>}
+          </div>
+        }
       />
 
       <div className="mb-5">

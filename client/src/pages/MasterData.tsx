@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Trash2 } from '../components/icons'
+import { ExportButtons } from '../components/ExportButtons'
 import { masterDataService } from '../services/dataService'
 import type { MasterDataItem, MasterDataType } from '../types'
 import { getErrorMessage } from '../lib/errors'
@@ -16,15 +17,10 @@ import {
   TextInput,
 } from '../components/ui'
 
-const TABS: { value: MasterDataType; label: string; hint: string; descriptionHint: string }[] = [
-  {
-    value: 'category',
-    label: 'Category',
-    hint: 'The CSR activity heads from Schedule VII of the Companies Act, 2013 — a short label to pick from, with the full clause as its description.',
-    descriptionHint: 'The full Schedule VII clause this category covers',
-  },
-  { value: 'status', label: 'Status', hint: 'e.g. Active, Not Active', descriptionHint: 'What this status means' },
-  { value: 'source', label: 'Source', hint: 'e.g. Interest, SIP, FD', descriptionHint: 'What this source covers' },
+const TABS: { value: MasterDataType; label: string }[] = [
+  { value: 'category', label: 'Category' },
+  { value: 'status', label: 'Status' },
+  { value: 'source', label: 'Source' },
 ]
 
 export default function MasterData() {
@@ -84,12 +80,25 @@ export default function MasterData() {
 
   const activeTab = TABS.find((t) => t.value === tab)!
 
+  // Every master-data value, across all tabs — the export is the whole list, not the
+  // section currently on screen.
+  const masterDataCsv = {
+    filename: 'master-data',
+    headers: ['Type', 'Value', 'Description'],
+    rows: items.map((m) => [m.type, m.value, m.description || '—']) as (string | number)[][],
+  }
+
   return (
     <>
       <PageHeader
         title="Master Data"
         subtitle="Manage the value lists used as dropdowns across the app"
-        action={canWrite && <PrimaryButton onClick={openAdd}>Add {activeTab.label}</PrimaryButton>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <ExportButtons entity="master-data" csv={masterDataCsv} />
+            {canWrite && <PrimaryButton onClick={openAdd}>Add {activeTab.label}</PrimaryButton>}
+          </div>
+        }
       />
 
       <div className="mb-5 flex gap-1 border-b border-line">
@@ -106,8 +115,6 @@ export default function MasterData() {
           </button>
         ))}
       </div>
-
-      <p className="mb-4 text-xs text-muted">{activeTab.hint}</p>
 
       <Card className="p-2 sm:p-4">
         {rows.length === 0 ? (
@@ -144,7 +151,7 @@ export default function MasterData() {
             <TextInput
               required
               maxLength={80}
-              placeholder={tab === 'category' ? 'Short label, e.g. Rural Development' : activeTab.hint}
+              placeholder="Value"
               value={value}
               onChange={(e) => setValue(e.target.value)}
             />
@@ -153,7 +160,7 @@ export default function MasterData() {
             <TextArea
               rows={5}
               maxLength={2000}
-              placeholder={activeTab.descriptionHint}
+              placeholder="Description (optional)"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />

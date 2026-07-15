@@ -19,3 +19,4 @@ export const fundReceiptDocumentService = impl.fundReceiptDocumentService
 export const analyticsService = impl.analyticsService
 export const userAdminService = impl.userAdminService
 export const logService = impl.logService
+export const supportService = impl.supportService

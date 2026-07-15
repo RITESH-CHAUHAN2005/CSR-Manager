@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, Pencil, Trash2 } from '../components/icons'
+import { ExportButtons } from '../components/ExportButtons'
 import {
   companyService,
   financialYearService,
@@ -223,11 +224,32 @@ export default function Projects() {
     return [p.startDate, p.endDate].filter(Boolean).map((d) => formatDate(String(d))).join(' – ')
   }
 
+  const projectCsv = {
+    filename: 'projects',
+    headers: ['Project ID', 'Project', 'Companies', 'Category', 'Intervention Partner', 'Budget', 'Status', 'Start', 'End'],
+    rows: projects.map((p) => [
+      p.projectCode || '—',
+      p.name,
+      companyNames(p.companyIds),
+      p.category || '—',
+      p.interventionPartner || '—',
+      p.budget,
+      p.status,
+      p.startDate ? formatDate(String(p.startDate)) : '—',
+      p.derivedStatus === 'ongoing' ? 'Ongoing' : p.endDate ? formatDate(String(p.endDate)) : '—',
+    ]) as (string | number)[][],
+  }
+
   return (
     <>
       <PageHeader
         title="CSR Projects"
-        action={canCreate && <PrimaryButton onClick={openAdd}>Add Project</PrimaryButton>}
+        action={
+          <div className="flex flex-wrap gap-3">
+            <ExportButtons entity="projects" csv={projectCsv} />
+            {canCreate && <PrimaryButton onClick={openAdd}>Add Project</PrimaryButton>}
+          </div>
+        }
       />
 
       {deleteError && (

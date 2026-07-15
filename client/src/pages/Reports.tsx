@@ -673,11 +673,6 @@ export default function Reports() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
                   Total Received: <span className="font-semibold text-ink">{formatINR(yearTotals.fundsReceived)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(yearTotals.expenditure)}</span> · Closing Balance: <span className="font-semibold text-success">{formatINR(yearTotals.balance)}</span>
                 </div>
-                <p className="mt-2">
-                  Each year's closing balance becomes the next year's Carry Forward In, so{" "}
-                  {yearRows.at(-1)?.name ?? "the last year"}'s Carry Forward Out ({formatINR(yearTotals.carryForwardOut)})
-                  is the money still in hand.
-                </p>
               </TableToolbar>
               <DataTable
                 data={findRows(yearRows)}
@@ -729,10 +724,6 @@ export default function Reports() {
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
                   Total Received: <span className="font-semibold text-ink">{formatINR(companyTotals.received)}</span> · Expenditure: <span className="font-semibold text-danger">{formatINR(companyTotals.expenditure)}</span> · Balance: <span className="font-semibold text-success">{formatINR(companyTotals.balance)}</span> · Carry Forward: <span className="font-semibold text-ink">{formatINR(companyTotals.carry)}</span>
                 </div>
-                <p className="mt-2">
-                  Balance is what came in minus what went out. Carry Forward is the slice of that
-                  balance still unspent on the company's Ongoing projects, which rolls into {rollsIntoFy}.
-                </p>
               </TableToolbar>
               <DataTable
                 data={findRows(companyRows)}
@@ -782,8 +773,7 @@ export default function Reports() {
 
             <Card className="p-5 sm:p-6">
               <TableToolbar value={search} onChange={setSearch}>
-                {projectRows.length} project{projectRows.length === 1 ? "" : "s"} · Utilization is
-                Spent ÷ Budget, so it measures the approved cost consumed — not the money received.
+                {projectRows.length} project{projectRows.length === 1 ? "" : "s"}
               </TableToolbar>
               <DataTable
                 data={findRows(projectRows)}
@@ -813,12 +803,40 @@ export default function Reports() {
 
         {tab === "carryForward" && (
           <>
-            <p className="mb-5 rounded-xl bg-ink/[0.03] px-4 py-3 text-sm text-muted">
-              For every <span className="font-medium text-ink/80">Ongoing</span> project: the funds
-              received against it, minus what has been spent on it. Whatever is left is the carry
-              forward — it rolls into <span className="font-medium text-ink/80">{rollsIntoFy}</span>.
-              Nothing here is typed in; it is derived from Fund Receipts and Expenditures.
-            </p>
+            <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <ChartCard title="Received vs Spent vs Carry Forward by Project">
+                  {cfRows.length > 0 ? (
+                    <Bar
+                      data={{
+                        labels: cfRows.map((r) => r.projectCode || r.projectName),
+                        datasets: [
+                          { label: "Received", data: cfRows.map((r) => r.received), backgroundColor: CHART_COLORS.received, borderRadius: 8, maxBarThickness: 30 },
+                          { label: "Spent", data: cfRows.map((r) => r.spent), backgroundColor: CHART_COLORS.spent, borderRadius: 8, maxBarThickness: 30 },
+                          { label: "Carry Forward", data: cfRows.map((r) => r.carryForward), backgroundColor: CHART_COLORS.carryForwardIn, borderRadius: 8, maxBarThickness: 30 },
+                        ],
+                      }}
+                      options={moneyBarOptions({ rotateLabels: cfRows.length > 4 })}
+                    />
+                  ) : (
+                    <EmptyChartNote />
+                  )}
+                </ChartCard>
+              </div>
+              <ChartCard title="Carry Forward Share by Project">
+                {cfRows.some((r) => r.carryForward > 0) ? (
+                  <Pie
+                    data={{
+                      labels: cfRows.filter((r) => r.carryForward > 0).map((r) => r.projectCode || r.projectName),
+                      datasets: [{ data: cfRows.filter((r) => r.carryForward > 0).map((r) => r.carryForward), backgroundColor: cfRows.filter((r) => r.carryForward > 0).map((_, i) => colorFor(i)), borderWidth: 0, hoverOffset: 6 }],
+                    }}
+                    options={pieOptions()}
+                  />
+                ) : (
+                  <EmptyChartNote text="No carry forward to chart yet." />
+                )}
+              </ChartCard>
+            </div>
 
             {unlinkedOngoing.length > 0 && (
               <p className="mb-5 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">

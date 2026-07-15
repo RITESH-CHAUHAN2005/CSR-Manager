@@ -59,6 +59,49 @@ An expenditure is deliberately minimal: **project, company, financial year, amou
 
 ---
 
+## 0.5 What changed on 2026-07-15 — help desk, self-service passwords, wider exports
+
+A second release layered on top of 2026-07-14. The headline is an **admin-mediated password recovery + help-desk** flow (there is no email/SMTP anywhere), a **self-service Change Password**, a **Source** filter/column on Fund Receipts, richer Company detail, a chart on the Carry Forward report, and **server-generated PDF/Excel exports on nearly every list page**. The backend and database parts below are what an app build must match; the rest is UI parity.
+
+### 0.5.1 Backend / DB — the app must handle these
+
+| # | Change | What the app must do |
+|---|---|---|
+| 1 | **New collection `SupportRequest`** (the help desk). Fields: `userId`, `name?`, `email?`, `type` (`'password'` \| `'general'`), `subject?`, `message?`, `status` (`'pending'` \| `'approved'` \| `'rejected'` \| `'resolved'`, default `pending`), `reply?`, `resolvedByEmail?`, timestamps. | Add the model + screens described below. |
+| 2 | **Old `PasswordResetRequest` model REMOVED**, and the old **`/api/users/reset-requests*` routes REMOVED.** | Any app build still calling `/users/reset-requests…` will now 404 — move to the endpoints in §0.5.2. |
+| 3 | **New `User` field `mustChangePassword: boolean`** (default `false`). It is **kept in API responses** (not stripped in `toJSON`, unlike `passwordHash`/`loginAttempts`). | When `true`, force the user through a password change before letting them use the app; clear it by calling `/auth/change-password`. |
+| 4 | **Password recovery is admin-mediated — no email is ever sent.** The temporary password pattern is **`<firstname>@apl123`** — the first name token, lowercased (e.g. "Ravi Kumar" → `ravi@apl123`). | The login screen gets a "Forgot password?" flow (email only, §0.5.2). Recovery is: user asks → admin approves → admin tells the user the temp password out-of-band → user logs in and is forced to change it. |
+
+### 0.5.2 New / changed endpoints
+
+All are live now. `forgot-password` is public (rate-limited); the rest need auth; `/support-requests` admin actions need `requireAdmin`.
+
+| Method + path | Access | Body | Effect |
+|---|---|---|---|
+| `POST /auth/forgot-password` | **public**, rate-limited (shares the login limiter) | `{ email }` | Creates a `type:'password'` SupportRequest for that user. **Anti-enumeration: always returns `{ ok: true }`**, whether or not the email exists — never leak account existence. |
+| `POST /auth/change-password` | auth | `{ currentPassword, newPassword }` | Verifies the current password, sets the new one, **clears `mustChangePassword`**. `newPassword` obeys the same policy as user creation (min 8 chars, ≥1 letter, ≥1 number). |
+| `POST /support-requests` | auth | `{ subject, message }` | Files a **general** help-desk ticket for the caller. |
+| `GET  /support-requests/mine` | auth | — | The caller's own tickets, including any admin `reply`. |
+| `GET  /support-requests` | **admin** | — | The **pending** queue (both password and general). |
+| `POST /support-requests/:id/approve` | **admin** | — | **Password tickets only.** Resets that user to the temporary password `<firstname>@apl123`, sets their `mustChangePassword = true`, marks the ticket `approved`. Returns **`{ id, tempPassword }`** so the admin can read the temp password back to the user. |
+| `POST /support-requests/:id/reject` | **admin** | — | Marks the ticket `rejected`. |
+| `POST /support-requests/:id/reply` | **admin** | `{ reply }` | Replies to a **general** ticket and marks it `resolved`. The reply surfaces on the user's "My Requests" list. |
+
+### 0.5.3 Roles / navigation
+
+- **"My Dashboard"** (the personal profile page) is now **editor + viewer only — admins do NOT have it.** It holds three things: self-service **Change Password**, a **Raise a Request** help-desk form (files a `general` ticket), and a **My Requests** list that shows the admin's replies.
+- **Admins** get **Change Password** inside the **Admin Panel** instead, which also gains the **Help Desk Requests** queue. Each queued row carries a **type badge — "Password" vs "General"** — so the admin knows whether to *approve* (reset the password) or *reply* (answer a question).
+
+### 0.5.4 UI-only changes (no API impact — match for parity)
+
+- **Fund Receipts**: a new **Source** filter on the list; the old "Donor Company / Source" column now reads **`Company — Source`** (company first). See §5.5.
+- **Company detail**: shows **CIN & PAN** as labeled fields, and a **Source** column in its fund-receipts table. See §5.2.
+- **Reports**: the explanatory prose blurbs were **removed** from the report tabs — **totals and actionable warnings are kept**. The **Carry Forward** tab gains a **bar chart** (Received vs Spent vs Carry Forward) plus a **pie chart** (each project's share of total carry forward). See §5.8.
+- **Exports**: every list page now has **Export PDF / Export Excel** *except* the **Dashboard** and **Financial Years** — plus **Company detail** (a comprehensive per-company report) and **Admin → Activity Logs**. Driven by the export types in §5.11 / §6.
+- **Master Data**: the descriptive hint/placeholder texts were removed (the Schedule VII blurb, "e.g. Active, Not Active", "e.g. Interest, SIP, FD", etc.). The value + description fields themselves are unchanged.
+
+---
+
 ## 1. Data model
 
 Seven collections. Anything an app screen shows is either one of these fields or is derived from them at read time — **no totals, balances, or "spent" figures are stored**.
@@ -108,9 +151,16 @@ Dates are ISO `yyyy-mm-dd` strings and are compared as strings. **More than one 
 
 - **`description`** — what the value covers, as plain prose. For the **Category** list this carries the full **Schedule VII** clause (Companies Act, 2013) behind the short 2–3 word label — see §10 for the exact 12 values. **[APP TODO]** — surface the description under each category value, and under the Category dropdown on the project form.
 
-### User / AuditLog
-`User`: `name`, `email`, `role` (`admin` | `editor` | `viewer`), optional `companyId`. No self-registration.
+### User / AuditLog / SupportRequest
+`User`: `name`, `email`, `role` (`admin` | `editor` | `viewer`), optional `companyId`, **`mustChangePassword`** (boolean, default `false`). No self-registration.
+
+- **`mustChangePassword`** is set `true` when an admin approves a password-reset request (the account is now on the temporary password `<firstname>@apl123`) and cleared when the user sets their own password via `/auth/change-password`. Unlike `passwordHash`/`loginAttempts`, it is **kept in `toJSON` / API responses** — the client reads it to decide whether to force a password change. **[APP TODO]** — honour it on login and after `/auth/me`.
+
 `AuditLog`: every mutating request, with a field-level before→after diff.
+
+`SupportRequest` *(new 2026-07-15)*: the help desk. `userId` · `name?` · `email?` · `type` (`password` | `general`) · `subject?` · `message?` · `status` (`pending` | `approved` | `rejected` | `resolved`, default `pending`) · `reply?` · `resolvedByEmail?` · timestamps.
+
+- A **`password`** ticket is a "forgot my password" request an admin *approves* (resetting the account to a temp password) or *rejects*. A **`general`** ticket is a free-text help message an admin *replies* to (which marks it `resolved`). Replaces the removed `PasswordResetRequest` model. Full flow in §3.1.
 
 ---
 
@@ -163,8 +213,20 @@ The legacy `FundReceipt.carryForward` field is **no longer read by any report**.
   - **`Authorization: Bearer` fallback** — the login response also returns the raw `token`. **The mobile app must use this**, storing it in AsyncStorage; cookies are not workable across the split-domain setup.
 - Session is restored via `GET /auth/me`. A rejected/expired token must log the user out and return them to Login.
 - Report-download endpoints (`/reports/export/...`) additionally accept `?token=` in the query string, because a native file download can't set headers.
-- **Rate limits:** 600 requests / 15 min globally; **10 failed logins / 15 min** on `/auth/login` (successful logins don't count).
+- **Rate limits:** 600 requests / 15 min globally; **10 failed logins / 15 min** on `/auth/login` (successful logins don't count). The same limiter guards `POST /auth/forgot-password`.
 - Every sign-in, failed sign-in, and create/update/delete is written to the Activity Log automatically.
+
+### 3.1 Password recovery & change *(2026-07-15 — admin-mediated, no email)*
+
+There is **no email/SMTP** in this system. A forgotten password is recovered through the admin, via the `SupportRequest` help desk (§1):
+
+1. **Login → "Forgot password?"** collects **email only** and calls `POST /auth/forgot-password` (public, rate-limited). This creates a `type:'password'` SupportRequest. The endpoint **always responds `{ ok: true }`** regardless of whether the email exists — anti-enumeration, so the app must show the same "if that account exists, an admin will review it" message either way.
+2. An **admin** sees the ticket in the Admin Panel's Help Desk queue and calls **`POST /support-requests/:id/approve`**. That resets the user to the temporary password **`<firstname>@apl123`** (first name token, lowercased), sets `mustChangePassword = true`, and returns `{ id, tempPassword }` so the admin can pass it to the user out-of-band. (Or the admin **rejects** it.)
+3. The user logs in with the temp password. Because `mustChangePassword` is `true`, the app **forces a password change** — `POST /auth/change-password` `{ currentPassword, newPassword }`, which sets the new password and clears the flag. `newPassword` must meet the create-user policy: **min 8 chars, ≥1 letter, ≥1 number.**
+
+Any signed-in user can also change their password at will (same `/auth/change-password` endpoint) and can file a **general** help-desk ticket — see §5.9 / §5.12.
+
+**[APP TODO]** — add the "Forgot password?" link on Login, the forced-change gate when `mustChangePassword` is `true`, and a self-service Change Password screen.
 
 ## 4. Roles & permissions
 
@@ -192,7 +254,7 @@ All of it comes from `GET /dashboard/summary` so the app and website can never d
 - Flat table; live search over name, CIN, **PAN**, contact person, email.
 - **Add/Edit**: Name (required), CIN, **PAN**, Contact Person, Phone, Email, Address, **Description**.
 - **Delete does NOT cascade.** Deleting a company removes only the company document — its projects, receipts and expenditures survive as orphans. **[APP TODO]** — the app's delete dialog currently *claims* it cascades. Fix the copy; don't implement a cascade.
-- **Company Detail**: CIN + **PAN** under the name · contact tile · Fund Overview (Received, Carry Forward, Expenditure, Current Balance, Total/Active Projects) · Year-wise Fund Summary · Projects table (**with Project ID**) · Fund Receipts table.
+- **Company Detail**: **CIN & PAN** shown as labeled fields under the name · contact tile · Fund Overview (Received, Carry Forward, Expenditure, Current Balance, Total/Active Projects) · Year-wise Fund Summary · Projects table (**with Project ID**) · Fund Receipts table (**with a Source column**, 2026-07-15). Has its own **Export PDF / Export Excel** — a comprehensive per-company report (§5.11).
 
 Carry Forward for a company = the sum of its derived carry-forward rows (§2).
 Current Balance = Received − Expenditure. **Carry Forward is not added to it.**
@@ -237,7 +299,7 @@ Shared fields: Financial Year (**active years only**), Project (optional, shown 
 
 - **Attach Proof** (optional): any file type, **any number of them**, 15 MB each. On a grid entry, each staged file is attached to **every** receipt the entry creates.
 - **Editing** is always single-record, whatever the project. Deleting a receipt also deletes its proof documents.
-- List columns: Date · Donor Company / Source · Year · **Project ID** · Project · Account Number · Amount. Header shows record count + running total, recalculated with the filters (Company, Year, search).
+- List columns: Date · **Company — Source** · Year · **Project ID** · Project · Account Number · Amount. The donor/source column now leads with the **company** and appends the Source after an em-dash (an `other_source` receipt reads e.g. `ABC Ltd — Interest`; a plain company receipt shows just the company). Filters: **Company**, **Source** *(new 2026-07-15 — Master Data `source` values)*, **Year**, and free-text search. The header shows record count + running total, recalculated with all active filters.
 
 ### 5.6 Expenditures
 - **Project** (required) drives everything. It is picked as `PROJECTID — Name` and it narrows the **Company** dropdown to that project's companies.
@@ -260,6 +322,8 @@ Three tabs — **Category**, **Status**, **Source** — each a list of values **
 
 The **Category** list holds the **12** statutory **Schedule VII** activity heads (§10): a short 2–3 word `value` to pick from, with the clause as its `description`, in plain prose.
 
+*(2026-07-15)* The descriptive hint/placeholder texts on this screen were **removed** — the Schedule VII explainer blurb, the "e.g. Active, Not Active" status hint, the "e.g. Interest, SIP, FD" source hint, etc. Only the `value` and `description` inputs remain; the data model is unchanged.
+
 **[APP TODO]** — this screen does not exist in the app yet.
 
 ### 5.8 Reports
@@ -272,13 +336,14 @@ Filters: **Company** and **Financial Year** dropdowns at the top of the page, wh
 │  [ 🔍 Search… ]                          ← top-LEFT, on its │
 │                                            own line         │
 │  Total Received: ₹1,48,02,937 · Expenditure: ₹67,36,910 …  │  ← totals, full width
-│  Each year's closing balance becomes the next year's …      │  ← explanation, full width
+│  ⚠ 2 Ongoing projects have no linked receipt …             │  ← warnings only, full width
 │  ─────────────────────────────────────────────────────────  │
 │  FINANCIAL YEAR │ FUNDS RECEIVED │ CARRY FORWARD IN │ …     │
 └────────────────────────────────────────────────────────────┘
 ```
 
-- The search box sits **top-left, above the table, on its own line** — not beside the totals. Giving the totals and the explanatory line the full width is what keeps them readable; squeezing them into the space left over next to a right-hand search box wraps them into a mess.
+- The search box sits **top-left, above the table, on its own line** — not beside the totals. Giving the totals the full width is what keeps them readable; squeezing them into the space left over next to a right-hand search box wraps them into a mess.
+- *(2026-07-15)* The **explanatory prose blurbs were removed** from every tab — the running-position explainer, etc. **Totals and actionable warnings are kept** (e.g. the Carry Forward tab's "Ongoing projects with no linked receipt" banner). Match that: keep the numbers and the warnings, drop the paragraphs.
 - It matches **any text column** on the row, so a Project ID, a project name and a company name all work without the user having to pick which field they meant.
 - It **filters the table only**. The charts and the totals keep reflecting the Company/Year dropdowns, so the overview doesn't shift on every keystroke.
 - It is **cleared when the tab changes** — each tab searches different columns, so a carried-over query just looks broken.
@@ -290,7 +355,7 @@ Five tabs:
 2. **Year-wise** — bar (Received / Carry In / Expenditure) + pie (expenditure share). Table: Financial Year, Funds Received, Carry Forward In, Total Available, Expenditure, Balance, Carry Forward Out. Each year's closing balance is the next year's Carry Forward In, so those columns are running positions — **do not sum them down the column**.
 3. **Company-wise** — bar + pie. Table: Company, Total Received, Expenditure, **Balance**, **Carry Forward**, Projects (in that order — Balance is received − expenditure; Carry Forward is a slice of it).
 4. **Project-wise** — bar (Budget vs Spent, top 10, labelled by Project ID) + pie (projects by status). Table: **Project ID, Project, Company, Intervention Partner, Period, Budget, Received, Spent, Utilization %, Status**.
-5. **Carry Forward** — table: **Project ID, Project, Company, Received, Spent, Carry Forward, Rolls Into**. One row per (Ongoing project × company), derived (§2). Ongoing projects with no receipt linked to them are called out in a banner, since no carry forward can be computed for them.
+5. **Carry Forward** — *(2026-07-15)* now has a **bar chart** (Received vs Spent vs Carry Forward) + **pie chart** (each project's share of total carry forward), above the table. Table: **Project ID, Project, Company, Received, Spent, Carry Forward, Rolls Into**. One row per (Ongoing project × company), derived (§2). Ongoing projects with no receipt linked to them are still called out in a banner, since no carry forward can be computed for them.
 
 **Export**: server-generated **PDF** and **Excel** via `GET /reports/export/{pdf|excel}?type=<tab>`. The website falls back to browser-print / client-side CSV when the API is unavailable; the app should just use the server endpoints and hand the file to the native share sheet.
 
@@ -298,7 +363,11 @@ Five tabs:
 - Stat cards — Total Users / Admins / Editors / Viewers; tapping one lists those users.
 - **Add User**: Name, Email, Password (**min 8 chars, ≥1 letter, ≥1 number**), Role.
 - **All Users** table with delete. **Cannot delete your own account, and cannot delete the last remaining admin.**
-- **Activity Logs**: search + filter by action and by user; each row expands to the field-level before→after diff; share a single entry; "Clear Logs" wipes the collection.
+- **Change Password** *(2026-07-15)* — admins change **their own** password here (they have no "My Dashboard"; §5.12). Uses `POST /auth/change-password`.
+- **Help Desk Requests** *(2026-07-15)* — the pending `SupportRequest` queue (`GET /support-requests`). Each row carries a **type badge — "Password" vs "General"**:
+  - **Password** ticket → **Approve** (`POST /support-requests/:id/approve`, resets the user to `<firstname>@apl123` and reveals the temp password to relay) or **Reject** (`…/reject`).
+  - **General** ticket → **Reply** (`POST /support-requests/:id/reply` `{ reply }`, marks it `resolved`; the reply shows on the user's My Requests list).
+- **Activity Logs**: search + filter by action and by user; each row expands to the field-level before→after diff; share a single entry; "Clear Logs" wipes the collection. Has **Export PDF / Export Excel** (§5.11).
 
 ### 5.10 Document attachments
 Supported on **Projects**, **Expenditures** and **Fund Receipts** (there labelled "Attach Proof"). Bytes are stored in MongoDB (no disk on the free tier). Any file type — photo, PDF, doc, CSV.
@@ -312,6 +381,32 @@ Supported on **Projects**, **Expenditures** and **Fund Receipts** (there labelle
 - **Deleting the parent record deletes its documents** (server-side cascade) — no orphaned blobs.
 
 **[APP TODO]** — the app has no upload feature at all yet.
+
+### 5.11 Exports *(server-generated PDF / Excel)*
+
+Every list page has **Export PDF** and **Export Excel** buttons **except the Dashboard and Financial Years**. Exports are also on **Company detail** (a comprehensive per-company report) and **Admin → Activity Logs**. All are one call:
+
+```
+GET /reports/export/{pdf|excel}?type=<type>[&companyId=<id>]
+```
+
+`<type>` is one of: `year`, `company`, `project`, `carryForward`, `ledger` *(the five Report tabs)*, `companies`, `company-detail` *(needs `&companyId=`)*, `projects`, `fund-receipts`, `expenditures`, `financial-years`, `master-data`, `users`, `activity-logs`.
+
+- **`company-detail`** is multi-section — company info + fund overview + year-wise summary + projects + fund receipts, assembled as one report.
+- These endpoints also accept **`?token=`** in the query string (a native download can't set an `Authorization` header) — see §3.
+- **PDF fixes (2026-07-15):** long text (e.g. Master Data Schedule VII descriptions) now **wraps** onto multiple lines with dynamic row height, and **every table is scaled to fit the page width** so the right-hand columns are never clipped.
+
+The app should just call these endpoints and hand the returned file to the native share sheet.
+
+### 5.12 My Dashboard *(editor + viewer only — 2026-07-15)*
+
+The personal/profile page. **Admins do NOT have it** — their equivalents live in the Admin Panel (§5.9). It holds:
+
+- **Change Password** — self-service, `POST /auth/change-password`.
+- **Raise a Request** — a help-desk form (`POST /support-requests` `{ subject, message }`) that files a `general` ticket.
+- **My Requests** — the caller's own tickets via `GET /support-requests/mine`, showing status and any admin **reply**.
+
+**[APP TODO]** — build this profile screen (change password + raise/track help-desk tickets) for editor/viewer accounts.
 
 ---
 
@@ -335,11 +430,27 @@ GET    /fund-receipts/:id/documents   …
 GET    /dashboard/summary
 GET    /reports/year-wise
 GET    /reports/company-positions
-GET    /reports/carry-forward                                  ← NEW
-GET    /reports/export/{pdf|excel}?type={year|company|project|carryForward|ledger}
+GET    /reports/carry-forward
+GET    /reports/export/{pdf|excel}?type=<type>[&companyId=<id>][&token=<jwt>]
+       type ∈ year | company | project | carryForward | ledger        (Report tabs)
+              | companies | company-detail(&companyId) | projects
+              | fund-receipts | expenditures | financial-years
+              | master-data | users | activity-logs                   (per-page tables)
 
 POST   /auth/login    GET /auth/me    POST /auth/logout
+POST   /auth/forgot-password   { email }                 (public, rate-limited; always → {ok:true})
+POST   /auth/change-password   { currentPassword, newPassword }   (auth; clears mustChangePassword)
+
 GET    /users   POST /users   DELETE /users/:id          (admin)
+       (REMOVED: /users/reset-requests* — replaced by /support-requests)
+
+POST   /support-requests            { subject, message }  (auth — file a general ticket)
+GET    /support-requests/mine                             (auth — caller's own tickets + replies)
+GET    /support-requests                                  (admin — pending queue)
+POST   /support-requests/:id/approve                      (admin — password tickets; → { id, tempPassword })
+POST   /support-requests/:id/reject                       (admin)
+POST   /support-requests/:id/reply  { reply }             (admin — general tickets; marks resolved)
+
 GET    /logs    GET /logs/mine   DELETE /logs            (admin; /mine for self)
 ```
 
@@ -385,6 +496,9 @@ POST /api/expenditures
 - `Company.pan`, when non-empty, must match `^[A-Z]{5}[0-9]{4}[A-Z]$` (422).
 - Attachments: max **15 MB** per file (413). No cap on the number of files.
 - Deleting a company, financial year, or master-data value **does not cascade**.
+- **`/auth/forgot-password` never confirms an account exists** — it always returns `{ ok: true }` (anti-enumeration). Rate-limited by the login limiter.
+- **`/auth/change-password`** requires the correct `currentPassword`; `newPassword` must be **min 8 chars, ≥1 letter, ≥1 number**; success clears `mustChangePassword`.
+- **`/support-requests/:id/approve`** only acts on **`type:'password'`** tickets and resets the user to the temporary password **`<firstname>@apl123`**; `/reply` only acts on **`type:'general'`** tickets. Approve/reject/reply and the pending queue are **admin-only**.
 - Every write is Zod-validated and audit-logged with a before→after diff.
 
 ---

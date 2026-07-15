@@ -2,6 +2,7 @@ import { Router } from 'express'
 import authRoutes from './authRoutes.js'
 import analyticsRoutes from './analyticsRoutes.js'
 import userRoutes from './userRoutes.js'
+import supportRoutes from './supportRoutes.js'
 import logRoutes from './logRoutes.js'
 import { entityRouter } from './entityRouter.js'
 import { blockActiveProjectDelete } from '../middleware/guardProjectDelete.js'
@@ -36,6 +37,7 @@ api.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
 api.use('/auth', authRoutes)
 api.use('/users', userRoutes)
+api.use('/support-requests', supportRoutes)
 api.use('/logs', logRoutes)
 
 // All data resources: read = any role; create/update/delete = admin + editor.
